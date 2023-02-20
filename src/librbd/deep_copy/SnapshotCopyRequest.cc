@@ -117,7 +117,7 @@ void SnapshotCopyRequest<I>::cancel() {
 
 template <typename I>
 void SnapshotCopyRequest<I>::send_snap_unprotect() {
-
+//NITHYA: dst here is the local snapshot
   SnapIdSet::iterator snap_id_it = m_dst_snap_ids.begin();
   if (m_prev_snap_id != CEPH_NOSNAP) {
     snap_id_it = m_dst_snap_ids.upper_bound(m_prev_snap_id);

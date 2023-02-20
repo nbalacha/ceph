@@ -57,6 +57,7 @@ double round_to_two_places(double value) {
 template<typename I>
 std::pair<uint64_t, librbd::SnapInfo*> get_newest_mirror_snapshot(
     I* image_ctx) {
+      // NITHYA : reverse iterator starts from the last element
   for (auto snap_info_it = image_ctx->snap_info.rbegin();
        snap_info_it != image_ctx->snap_info.rend(); ++snap_info_it) {
     const auto& snap_ns = snap_info_it->second.snap_namespace;
@@ -227,7 +228,7 @@ bool Replayer<I>::get_replay_status(std::string* description,
     on_finish->complete(-EAGAIN);
     return false;
   }
-
+// NITHYA: Find the latest snapshots for both local and remote
   std::shared_lock local_image_locker{
     m_state_builder->local_image_ctx->image_lock};
   auto [local_snap_id, local_snap_info] = get_newest_mirror_snapshot(
@@ -287,17 +288,10 @@ bool Replayer<I>::get_replay_status(std::string* description,
       matching_remote_snap_it !=
         m_state_builder->remote_image_ctx->snap_info.end()) {
     root_obj["syncing_snapshot_timestamp"] = remote_snap_info->timestamp.sec();
-
-    if (m_local_object_count > 0) {
-      root_obj["syncing_percent"] =
-	100 * m_local_mirror_snap_ns.last_copied_object_number /
-	m_local_object_count;
-    } else {
-      // Set syncing_percent to 0 if m_local_object_count has
-      // not yet been set (last_copied_object_number may be > 0
-      // if the sync is being resumed).
-      root_obj["syncing_percent"] = 0;
-    }
+    // NITHYA : can m_local_object_count be zero?
+    root_obj["syncing_percent"] = static_cast<uint64_t>(
+        100 * m_local_mirror_snap_ns.last_copied_object_number /
+        static_cast<float>(std::max<uint64_t>(1U, m_local_object_count)));
   }
 
   m_bytes_per_second(0);
@@ -461,6 +455,7 @@ void Replayer<I>::scan_local_mirror_snapshots(
 
   std::set<uint64_t> prune_snap_ids;
 
+// NITHYA: TODO figure out where this snap_info is loaded. It is saved on disk.
   auto local_image_ctx = m_state_builder->local_image_ctx;
   std::shared_lock image_locker{local_image_ctx->image_lock};
   for (auto snap_info_it = local_image_ctx->snap_info.begin();
@@ -480,6 +475,8 @@ void Replayer<I>::scan_local_mirror_snapshots(
     if (mirror_ns->is_non_primary()) {
       if (mirror_ns->complete) {
         // if remote has new snapshots, we would sync from here
+        // NITHYA: sets starting point to last complete snapshot
+        // or base image (would that be 0?)
         m_local_snap_id_start = local_snap_id;
         ceph_assert(m_local_snap_id_end == CEPH_NOSNAP);
 
@@ -503,6 +500,7 @@ void Replayer<I>::scan_local_mirror_snapshots(
       } else {
         // start snap will be last complete mirror snapshot or initial
         // image revision
+        // NITHYA: first non-complete snapshot in the list? 
         m_local_snap_id_end = local_snap_id;
         break;
       }
@@ -527,6 +525,8 @@ void Replayer<I>::scan_local_mirror_snapshots(
 
   if (m_local_snap_id_start > 0) {
     // remove candidate that is required for delta snapshot sync
+    //NITHYA: remove this snap from the set of 
+    // snapshots to be erased - ie, don't erase this snap.
     prune_snap_ids.erase(m_local_snap_id_start);
   }
   if (!prune_snap_ids.empty()) {
@@ -539,6 +539,7 @@ void Replayer<I>::scan_local_mirror_snapshots(
   }
 
   if (m_local_snap_id_start > 0 || m_local_snap_id_end != CEPH_NOSNAP) {
+    //NITHYA : multiple snapshots?
     if (m_local_mirror_snap_ns.is_non_primary() &&
         m_local_mirror_snap_ns.primary_mirror_uuid !=
           m_state_builder->remote_mirror_uuid) {
@@ -672,6 +673,7 @@ void Replayer<I>::scan_remote_mirror_snapshots(
     }
 
     // found candidate snapshot to sync
+    // NITHYA: Found a remote snap which is newer than the last local snapshot.
     ++m_pending_snapshots;
     if (m_remote_snap_id_end != CEPH_NOSNAP) {
       continue;
@@ -1338,6 +1340,7 @@ void Replayer<I>::finish_sync() {
   load_local_image_meta();
 }
 
+// NITHYA : TODO: Figure out how this works
 template <typename I>
 void Replayer<I>::register_local_update_watcher() {
   dout(10) << dendl;

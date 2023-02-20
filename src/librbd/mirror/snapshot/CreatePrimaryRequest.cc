@@ -92,6 +92,7 @@ void CreatePrimaryRequest<I>::handle_get_mirror_peers(int r) {
   }
 
   for (auto &peer : peers) {
+    // NITHYA: Does this mean the peer is receiving or transmitting?
     if (peer.mirror_peer_direction == cls::rbd::MIRROR_PEER_DIRECTION_RX) {
       continue;
     }

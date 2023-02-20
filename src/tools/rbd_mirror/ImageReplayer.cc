@@ -358,7 +358,7 @@ void ImageReplayer<I>::bootstrap() {
       m_pool_meta_cache, &m_progress_cxt, &m_state_builder, &m_resync_requested,
       ctx);
 
-  request->get();
+  request->get();  //NITHYA: increments RefCount 
   m_bootstrap_request = request;
 
   // proceed even if stop was requested to allow for m_delete_requested

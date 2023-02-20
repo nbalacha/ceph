@@ -16,6 +16,7 @@ class ImageCtx;
 
 namespace object_map {
 
+//NITHYA: Is this request sent only when a snapshot is created???
 template <typename ImageCtxT = ImageCtx>
 class CreateRequest {
 public:
