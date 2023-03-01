@@ -1112,7 +1112,7 @@ void Replayer<I>::handle_copy_image(int r) {
 
   {
     std::unique_lock locker{m_lock};
-    m_bytes_per_snapshot(m_snapshot_bytes);
+    m_hot(m_snapshot_bytes);
     auto time = ceph_clock_now() - m_snapshot_replay_start;
     if (g_snapshot_perf_counters) {
       g_snapshot_perf_counters->inc(l_rbd_mirror_snapshot_replay_bytes,

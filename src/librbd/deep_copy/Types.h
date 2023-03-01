@@ -17,8 +17,8 @@ enum {
   OBJECT_COPY_REQUEST_FLAG_EXISTS_CLEAN = 1U << 2,
 };
 
-typedef std::vector<librados::snap_t> SnapIds;
-typedef std::map<librados::snap_t, SnapIds> SnapMap;
+typedef std::vector<librados::snap_t> SnapIds; 
+typedef std::map<librados::snap_t, SnapIds> SnapMap; // NITHYA: What is this for??
 
 typedef boost::optional<uint64_t> ObjectNumber;
 

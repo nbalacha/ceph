@@ -11,7 +11,7 @@ enum DiffState {
   DIFF_STATE_HOLE         = 0, /* unchanged hole */
   DIFF_STATE_DATA         = 1, /* unchanged data */
   DIFF_STATE_HOLE_UPDATED = 2, /* new hole */
-  DIFF_STATE_DATA_UPDATED = 3  /* new data */
+  DIFF_STATE_DATA_UPDATED = 3  /* new data */ // NITHYA: was a hole earlier, now has data
 };
 
 } // namespace object_map

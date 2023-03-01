@@ -229,6 +229,8 @@ void RenameRequest<I>::send_update_directory() {
   rados_completion->release();
 }
 
+
+//NITHYA: Is this actually removing the rbd_id.<image_name>?
 template <typename I>
 void RenameRequest<I>::send_remove_source_header() {
   I &image_ctx = this->m_image_ctx;

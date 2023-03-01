@@ -36,12 +36,13 @@ void DiffRequest<I>::send() {
     return;
   }
 
-  m_object_diff_state->clear();
+  m_object_diff_state->clear(); // NITHYA: This is passed as input so make sure it is cleared
 
   // collect all the snap ids in the provided range (inclusive)
   if (m_snap_id_start != 0) {
     m_snap_ids.insert(m_snap_id_start);
   }
+
 
   std::shared_lock image_locker{m_image_ctx->image_lock};
   auto snap_info_it = m_image_ctx->snap_info.upper_bound(m_snap_id_start);
@@ -99,13 +100,14 @@ void DiffRequest<I>::load_object_map(
         return;
       }
 
-      load_object_map(image_locker);
+      load_object_map(image_locker);  // NITHYA: Try to find the next snap in the range
       return;
     }
 
     m_current_size = snap_it->second.size;
   }
 
+  // NITHYA: We found a snap
   uint64_t flags = 0;
   int r = m_image_ctx->get_flags(m_current_snap_id, &flags);
   if (r < 0) {
@@ -155,7 +157,7 @@ void DiffRequest<I>::handle_load_object_map(int r) {
     ldout(cct, 10) << "object map " << oid << " does not exist" << dendl;
 
     std::shared_lock image_locker{m_image_ctx->image_lock};
-    load_object_map(&image_locker);
+    load_object_map(&image_locker);  //NITHYA: Find the next available snap_id
     return;
   } else if (r < 0) {
     lderr(cct) << "failed to load object map: " << oid << dendl;
@@ -169,10 +171,10 @@ void DiffRequest<I>::handle_load_object_map(int r) {
   if (m_object_map.size() < num_objs) {
     ldout(cct, 1) << "object map too small: "
                   << m_object_map.size() << " < " << num_objs << dendl;
-    finish(-EINVAL);
+    finish(-EINVAL);  //NITHYA: Invalid object map - snap size larger than the obj map size
     return;
   } else {
-    m_object_map.resize(num_objs);
+    m_object_map.resize(num_objs); // NITHYA: Reducing to the snap size???
   }
 
   uint64_t prev_object_diff_state_size = m_object_diff_state->size();
@@ -215,9 +217,10 @@ void DiffRequest<I>::handle_load_object_map(int r) {
   }
   ldout(cct, 20) << "computed overlap diffs" << dendl;
 
-  bool diff_from_start = (m_snap_id_start == 0);
+  bool diff_from_start = (m_snap_id_start == 0); //NITHYA: start point is the image itself?
   auto end_it = m_object_map.end();
-  if (m_object_map.size() > prev_object_diff_state_size) {
+  if (m_object_map.size() > prev_object_diff_state_size) { //NITHYA: image was expanded?
+    //NITHYA : update non-overlapping objects
     for (; it != end_it; ++it,++diff_it, ++i) {
       uint8_t object_map_state = *it;
       if (object_map_state == OBJECT_NONEXISTENT) {
@@ -240,7 +243,7 @@ void DiffRequest<I>::handle_load_object_map(int r) {
   m_object_diff_state_valid = true;
 
   std::shared_lock image_locker{m_image_ctx->image_lock};
-  load_object_map(&image_locker);
+  load_object_map(&image_locker); //NITHYA: Get the next snap in the range
 }
 
 template <typename I>

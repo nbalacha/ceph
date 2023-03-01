@@ -16,11 +16,11 @@ namespace util {
 void compute_snap_map(CephContext* cct,
                       librados::snap_t src_snap_id_start,
                       librados::snap_t src_snap_id_end,
-                      const SnapIds& dst_snap_ids,
+                      const SnapIds& dst_snap_ids,  //NITHYA: m_dst_image_ctx->snaps which is the list of local snaps
                       const SnapSeqs &snap_seqs,
                       SnapMap *snap_map) {
   std::set<librados::snap_t> ordered_dst_snap_ids{
-    dst_snap_ids.begin(), dst_snap_ids.end()};
+    dst_snap_ids.begin(), dst_snap_ids.end()};  //NITHYA : constructs set with the contents of the range [first, last)
   auto dst_snap_id_it = ordered_dst_snap_ids.begin();
 
   SnapIds snap_ids;

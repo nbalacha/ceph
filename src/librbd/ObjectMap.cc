@@ -56,6 +56,7 @@ int ObjectMap<I>::aio_remove(librados::IoCtx &io_ctx, const std::string &image_i
 template <typename I>
 std::string ObjectMap<I>::object_map_name(const std::string &image_id,
 				          uint64_t snap_id) {
+  //NITHYA Example with snap id: rbd_object_map.1138782b21c6.00000000000000a6
   std::string oid(RBD_OBJECT_MAP_PREFIX + image_id);
   if (snap_id != CEPH_NOSNAP) {
     std::stringstream snap_suffix;
