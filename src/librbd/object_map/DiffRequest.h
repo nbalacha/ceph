@@ -64,7 +64,7 @@ private:
 
   std::set<uint64_t> m_snap_ids;
   uint64_t m_current_snap_id = 0;
-  bool m_ignore_enoent = false;
+  bool m_ignore_enoent = false; // NITHYA : cannot ignore a missing snap if it is the first or last
 
   uint64_t m_current_size = 0;
 

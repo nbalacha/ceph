@@ -227,7 +227,7 @@ void DiffRequest<I>::send() {
     return;
   }
 
-  m_object_diff_state->clear();
+  m_object_diff_state->clear(); // NITHYA: This is passed as input so make sure it is cleared
 
   if (m_snap_id_start == m_snap_id_end) {
     // no delta between the same snapshot
@@ -239,6 +239,7 @@ void DiffRequest<I>::send() {
     finish(0);
     return;
   }
+
 
   std::shared_lock image_locker{m_image_ctx->image_lock};
   if (is_diff_iterate() &&
@@ -356,7 +357,7 @@ void DiffRequest<I>::handle_load_object_map(int r) {
   }
 
   std::shared_lock image_locker{m_image_ctx->image_lock};
-  load_object_map(&image_locker);
+  load_object_map(&image_locker); //NITHYA: Get the next snap in the range
 }
 
 template <typename I>

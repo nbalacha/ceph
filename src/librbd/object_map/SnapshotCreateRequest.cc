@@ -100,6 +100,7 @@ void SnapshotCreateRequest::send_write_map() {
                 << dendl;
   m_state = STATE_WRITE_MAP;
 
+//NITHYA : Writes the object map it just read from the main image
   librados::ObjectWriteOperation op;
   op.write_full(m_read_bl);
 

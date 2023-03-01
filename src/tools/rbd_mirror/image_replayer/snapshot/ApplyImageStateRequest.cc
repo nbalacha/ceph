@@ -246,7 +246,7 @@ void ApplyImageStateRequest<I>::unprotect_snapshot() {
     }
 
     if (snap_info.protection_status == RBD_PROTECTION_STATUS_UNPROTECTED) {
-      dout(20) << "snapshot " << snap_id << " is already unprotected" << dendl;
+      dout(20) << "snapshot " << snap_id << " is already un" << dendl;
       continue;
     }
 

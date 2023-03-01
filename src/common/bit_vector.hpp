@@ -291,6 +291,13 @@ const bufferlist& BitVector<_b>::get_data() const {
   return m_data;
 }
 
+//NITHYA: Calculate the element(index) and then the bit in the element
+// _b =2
+// ELEMENTS_PER_BLOCK = 8/2 = 4
+//offset = 12
+// index = 12/4 = 3
+// shift = (4-1) - (12%4) * 2 =  3 - 0 * 2  = 6
+
 template <uint8_t _b>
 void BitVector<_b>::compute_index(uint64_t offset, uint64_t *index, uint64_t *shift) {
   *index = offset / ELEMENTS_PER_BLOCK;
@@ -330,6 +337,7 @@ uint64_t BitVector<_b>::get_header_length() const {
   return 18;
 }
 
+//NITHYA : From m_data to bufferlist
 template <uint8_t _b>
 void BitVector<_b>::encode_data(bufferlist& bl, uint64_t data_byte_offset,
 				uint64_t byte_length) const {
@@ -351,6 +359,7 @@ void BitVector<_b>::encode_data(bufferlist& bl, uint64_t data_byte_offset,
   }
 }
 
+//NITHYA : From bufferlist to m_data
 template <uint8_t _b>
 void BitVector<_b>::decode_data(bufferlist::const_iterator& it,
                                 uint64_t data_byte_offset) {
