@@ -99,6 +99,8 @@ void ObjectCopyRequest<I>::send_list_snaps() {
     }
   }
 
+  ldout(m_cct, 3) << "NITHYA : snap_ids" << snap_ids << dendl;
+
   auto list_snaps_flags = io::LIST_SNAPS_FLAG_DISABLE_LIST_FROM_PARENT;
 
   m_snapshot_delta.clear();
@@ -133,6 +135,7 @@ void ObjectCopyRequest<I>::handle_list_snaps(int r) {
 template <typename I>
 void ObjectCopyRequest<I>::send_read() {
   if (m_read_snaps.empty()) {
+    ldout(m_cct, 3) << "NITHYA: m_read_snaps is empty." << dendl;
     // all snapshots have been read
     merge_write_ops();
     compute_zero_ops();
@@ -140,10 +143,11 @@ void ObjectCopyRequest<I>::send_read() {
     send_update_object_map();
     return;
   }
-
+//  ldout(m_cct, 3) << "NITHYA: m_read_snaps:  " << m_read_snaps << " m_read_ops" << m_read_ops << dendl;
   auto index = *m_read_snaps.begin();
   auto& read_op = m_read_ops[index];
   if (read_op.image_interval.empty()) {
+    ldout(m_cct, 3) << "NITHYA: read_op.image_interval is empty for index = " << index << dendl;
     // nothing written to this object for this snapshot (must be trunc/remove)
     handle_read(0);
     return;
@@ -200,13 +204,15 @@ void ObjectCopyRequest<I>::handle_read(int r) {
   ceph_assert(!m_read_snaps.empty());
   m_read_snaps.erase(m_read_snaps.begin());
 
-  send_read();
+  send_read(); // NITHYA: Sends read for the next snap
 }
 
 template <typename I>
 void ObjectCopyRequest<I>::send_update_object_map() {
+  ldout(m_cct, 3) << "NITHYA: " << dendl;
   if (!m_dst_image_ctx->test_features(RBD_FEATURE_OBJECT_MAP) ||
       m_dst_object_state.empty()) {
+    ldout(m_cct, 3) << "NITHYA: Calling process_copyup" << dendl;
     process_copyup();
     return;
   }
@@ -230,7 +236,7 @@ void ObjectCopyRequest<I>::send_update_object_map() {
   auto object_state = dst_object_state.second;
   m_dst_object_state.erase(m_dst_object_state.begin());
 
-  ldout(m_cct, 20) << "dst_snap_id=" << dst_snap_id << ", object_state="
+  ldout(m_cct, 3) << "NITHYA: dst_snap_id=" << dst_snap_id << ", object_state="
                    << static_cast<uint32_t>(object_state) << dendl;
 
   int r;
@@ -286,11 +292,12 @@ void ObjectCopyRequest<I>::process_copyup() {
     // no data to copy or truncate/zero. only the copyup state machine cares
     // about whether the object exists or not, and it always copies from
     // snap id 0.
+    ldout(m_cct, 3) << "NITHYA: m_snapshot_sparse_bufferlist is empty" << dendl;
     finish(m_src_snap_id_start > 0 ? 0 : -ENOENT);
     return;
   }
 
-  ldout(m_cct, 20) << dendl;
+  ldout(m_cct, 3) << "NITHYA: " << dendl;
 
   // let dispatch layers have a chance to process the data but
   // assume that the dispatch layer will only touch the sparse bufferlist
@@ -309,6 +316,7 @@ void ObjectCopyRequest<I>::process_copyup() {
 template <typename I>
 void ObjectCopyRequest<I>::send_write_object() {
   ceph_assert(!m_snapshot_sparse_bufferlist.empty());
+  ldout(m_cct, 3) << "NITHYA: " << dendl;
   auto& sparse_bufferlist = m_snapshot_sparse_bufferlist.begin()->second;
 
   m_src_image_ctx->image_lock.lock_shared();
@@ -321,15 +329,17 @@ void ObjectCopyRequest<I>::send_write_object() {
   librados::snap_t dst_snap_seq = 0;
   librados::snap_t src_snap_seq = m_snapshot_sparse_bufferlist.begin()->first;
   if (src_snap_seq != 0) {
+    ldout(m_cct, 3) << "NITHYA: src_snap_seq = " << src_snap_seq << dendl;
     auto snap_map_it = m_snap_map.find(src_snap_seq);
     ceph_assert(snap_map_it != m_snap_map.end());
 
     auto dst_snap_id = snap_map_it->second.front();
     auto dst_may_exist_it = m_dst_object_may_exist.find(dst_snap_id);
     ceph_assert(dst_may_exist_it != m_dst_object_may_exist.end());
+    //ldout(m_cct, 3) << "NITHYA: dst_snap_id = " << dst_snap_id << " dst_may_exist_it = " << dst_may_exist_it << dendl;
     if (!dst_may_exist_it->second && !sparse_bufferlist.empty()) {
       // if the object cannot exist, the only valid op is to remove it
-      ldout(m_cct, 20) << "object DNE: src_snap_seq=" << src_snap_seq << dendl;
+      ldout(m_cct, 3) << "NITHYA: object DNE: src_snap_seq=" << src_snap_seq << dendl;
       ceph_assert(sparse_bufferlist.ext_count() == 1U);
       ceph_assert(sparse_bufferlist.begin().get_val().state ==
                     io::SPARSE_EXTENT_STATE_ZEROED &&
@@ -350,7 +360,7 @@ void ObjectCopyRequest<I>::send_write_object() {
     ceph_assert(dst_snap_seq != CEPH_NOSNAP);
   }
 
-  ldout(m_cct, 20) << "src_snap_seq=" << src_snap_seq << ", "
+  ldout(m_cct, 3) << "src_snap_seq=" << src_snap_seq << ", "
                    << "dst_snap_seq=" << dst_snap_seq << ", "
                    << "dst_snaps=" << dst_snap_ids << dendl;
 
@@ -358,15 +368,16 @@ void ObjectCopyRequest<I>::send_write_object() {
 
   bool migration = ((m_flags & OBJECT_COPY_REQUEST_FLAG_MIGRATION) != 0);
   if (migration) {
-    ldout(m_cct, 20) << "assert_snapc_seq=" << dst_snap_seq << dendl;
+    ldout(m_cct, 3) << "assert_snapc_seq=" << dst_snap_seq << dendl;
     cls_client::assert_snapc_seq(&op, dst_snap_seq,
                                  cls::rbd::ASSERT_SNAPC_SEQ_GT_SNAPSET_SEQ);
   }
 
   for (auto& sbe : sparse_bufferlist) {
+    ldout(m_cct, 3) << "NITHYa : sbe =" << sbe.get_val() << dendl;
     switch (sbe.get_val().state) {
     case io::SPARSE_EXTENT_STATE_DATA:
-      ldout(m_cct, 20) << "write op: " << sbe.get_off() << "~"
+      ldout(m_cct, 3) << "write op: " << sbe.get_off() << "~"
                        << sbe.get_len() << dendl;
       op.write(sbe.get_off(), std::move(sbe.get_val().bl));
       op.set_op_flags2(LIBRADOS_OP_FLAG_FADVISE_SEQUENTIAL |
@@ -377,19 +388,19 @@ void ObjectCopyRequest<I>::send_write_object() {
             m_dst_image_ctx->layout.object_size) {
         if (sbe.get_off() == 0) {
           if (hide_parent) {
-            ldout(m_cct, 20) << "create+truncate op" << dendl;
+            ldout(m_cct, 3) << "create+truncate op" << dendl;
             op.create(false);
             op.truncate(0);
           } else {
-            ldout(m_cct, 20) << "remove op" << dendl;
+            ldout(m_cct, 3) << "remove op" << dendl;
             op.remove();
           }
         } else {
-          ldout(m_cct, 20) << "trunc op: " << sbe.get_off() << dendl;
+          ldout(m_cct, 3) << "trunc op: " << sbe.get_off() << dendl;
           op.truncate(sbe.get_off());
         }
       } else {
-        ldout(m_cct, 20) << "zero op: " << sbe.get_off() << "~"
+        ldout(m_cct, 3) << "zero op: " << sbe.get_off() << "~"
                          << sbe.get_len() << dendl;
         op.zero(sbe.get_off(), sbe.get_len());
       }
@@ -400,6 +411,7 @@ void ObjectCopyRequest<I>::send_write_object() {
   }
 
   if (op.size() == (migration ? 1 : 0)) {
+    ldout(m_cct, 3) << "NITHYA handle_write_object (1) op " << dendl;
     handle_write_object(0);
     return;
   }
@@ -429,23 +441,25 @@ void ObjectCopyRequest<I>::send_write_object() {
 
 template <typename I>
 void ObjectCopyRequest<I>::handle_write_object(int r) {
-  ldout(m_cct, 20) << "r=" << r << dendl;
+  ldout(m_cct, 3) << "r=" << r << dendl;
 
   if (r == -ENOENT) {
     r = 0;
   } else if (r == -ERANGE) {
-    ldout(m_cct, 10) << "concurrent deep copy" << dendl;
+    ldout(m_cct, 3) << "concurrent deep copy" << dendl;
     r = 0;
   }
   if (r < 0) {
     lderr(m_cct) << "failed to write to destination object: " << cpp_strerror(r)
                  << dendl;
+    ldout(m_cct, 3) << "NITHYA: failed to write to destination object: " << cpp_strerror(r) << dendl;
     finish(r);
     return;
   }
 
   m_snapshot_sparse_bufferlist.erase(m_snapshot_sparse_bufferlist.begin());
   if (!m_snapshot_sparse_bufferlist.empty()) {
+    ldout(m_cct, 3) << "NITHYA: sending next write object" << dendl;
     send_write_object();
     return;
   }
@@ -480,6 +494,7 @@ void ObjectCopyRequest<I>::compute_read_ops() {
   for (auto& [key, image_intervals] : m_snapshot_delta) {
     io::WriteReadSnapIds write_read_snap_ids{key};
 
+    ldout(m_cct, 3) << "NITHYA " << " write_read_snap_ids: " << write_read_snap_ids << " m_src_snap_id_start: " <<  m_src_snap_id_start  << dendl;
     // advance the src write snap id to the first valid snap id
     if (write_read_snap_ids.first > m_src_snap_id_start) {
       // don't attempt to read from snapshots that shouldn't exist in
@@ -487,11 +502,13 @@ void ObjectCopyRequest<I>::compute_read_ops() {
       auto snap_map_it = m_snap_map.find(write_read_snap_ids.first);
       ceph_assert(snap_map_it != m_snap_map.end());
       auto dst_snap_seq = snap_map_it->second.front();
+      ldout(m_cct, 3) << "NITHYA " << " dst_snap_seq " << dst_snap_seq << dendl;
 
       auto dst_may_exist_it = m_dst_object_may_exist.find(dst_snap_seq);
+//      ldout(m_cct, 3) << "NITHYA: dst_may_exist_it = " << dst_may_exist_it <<  " write_read_snap_ids.first = "<< write_read_snap_ids.first << dendl;
       ceph_assert(dst_may_exist_it != m_dst_object_may_exist.end());
       if (!dst_may_exist_it->second) {
-        ldout(m_cct, 20) << "DNE snapshot: " << write_read_snap_ids.first
+        ldout(m_cct, 3) << "DNE snapshot: " << write_read_snap_ids.first
                          << dendl;
         continue;
       }
@@ -499,13 +516,14 @@ void ObjectCopyRequest<I>::compute_read_ops() {
 
     for (auto& image_interval : image_intervals) {
       auto state = image_interval.get_val().state;
+      ldout(m_cct, 3) << "NITHYA : image_interval = " << image_interval.get_val() << " state = " << state << dendl;
       switch (state) {
       case io::SPARSE_EXTENT_STATE_DNE:
         if (write_read_snap_ids == io::INITIAL_WRITE_READ_SNAP_IDS &&
             read_from_parent) {
           // special-case for DNE initial object-extents since when flattening
           // we need to read data from the parent images extents
-          ldout(m_cct, 20) << "DNE extent: "
+          ldout(m_cct, 3) << "DNE extent: "
                            << image_interval.get_off() << "~"
                            << image_interval.get_len() << dendl;
           dne_image_interval.insert(
@@ -514,9 +532,10 @@ void ObjectCopyRequest<I>::compute_read_ops() {
         break;
       case io::SPARSE_EXTENT_STATE_ZEROED:
         only_dne_extents = false;
+        ldout(m_cct, 3) << "NITHYA : SPARSE_EXTENT_STATE_ZEROED" << state << dendl;
         break;
       case io::SPARSE_EXTENT_STATE_DATA:
-        ldout(m_cct, 20) << "read op: "
+        ldout(m_cct, 3) << "read op: "
                          << "snap_ids=" << write_read_snap_ids << " "
                          << image_interval.get_off() << "~"
                          << image_interval.get_len() << dendl;
@@ -525,6 +544,7 @@ void ObjectCopyRequest<I>::compute_read_ops() {
         only_dne_extents = false;
         break;
       default:
+        ldout(m_cct, 3) << "NITHYA : default. Aborting" << dendl;
         ceph_abort();
         break;
       }
@@ -538,7 +558,7 @@ void ObjectCopyRequest<I>::compute_read_ops() {
 
     auto src_snap_seq = snap_map_it->first;
     WriteReadSnapIds write_read_snap_ids{src_snap_seq, src_snap_seq};
-
+    ldout(m_cct, 3) << "NITHYA : here (2)" << dendl;
     // prepare to prune the extents to the maximum parent overlap
     std::shared_lock image_locker(m_src_image_ctx->image_lock);
     uint64_t raw_overlap = 0;
@@ -547,7 +567,7 @@ void ObjectCopyRequest<I>::compute_read_ops() {
       ldout(m_cct, 5) << "failed getting parent overlap for snap_id: "
                       << src_snap_seq << ": " << cpp_strerror(r) << dendl;
     } else if (raw_overlap > 0) {
-      ldout(m_cct, 20) << "raw_overlap=" << raw_overlap << dendl;
+      ldout(m_cct, 3) << "raw_overlap=" << raw_overlap << dendl;
       io::Extents parent_extents;
       for (auto [image_offset, image_length] : dne_image_interval) {
         parent_extents.emplace_back(image_offset, image_length);
@@ -555,7 +575,7 @@ void ObjectCopyRequest<I>::compute_read_ops() {
       m_src_image_ctx->prune_parent_extents(parent_extents, m_image_area,
                                             raw_overlap, false);
       for (auto [image_offset, image_length] : parent_extents) {
-        ldout(m_cct, 20) << "parent read op: "
+        ldout(m_cct, 3) << "parent read op: "
                          << "snap_ids=" << write_read_snap_ids << " "
                          << image_offset << "~" << image_length << dendl;
         m_read_ops[write_read_snap_ids].image_interval.union_insert(
@@ -565,21 +585,24 @@ void ObjectCopyRequest<I>::compute_read_ops() {
   }
 
   for (auto& [write_read_snap_ids, _] : m_read_ops) {
+    ldout(m_cct, 3) << "NITHYA :  m_read_snaps push write_read_snap_ids "<< write_read_snap_ids << dendl;
     m_read_snaps.push_back(write_read_snap_ids);
   }
 }
 
 template <typename I>
 void ObjectCopyRequest<I>::merge_write_ops() {
-  ldout(m_cct, 20) << dendl;
+  ldout(m_cct, 3) << dendl;
 
   for (auto& [write_read_snap_ids, read_op] : m_read_ops) {
     auto src_snap_seq = write_read_snap_ids.first;
 
     // convert the resulting sparse image extent map to an interval ...
     auto& image_data_interval = m_dst_data_interval[src_snap_seq];
+    ldout(m_cct, 3) << "NITHYA : src_snap_seq" << src_snap_seq  << ", image_data_interval" << image_data_interval << dendl;
     for (auto [image_offset, image_length] : read_op.image_extent_map) {
       image_data_interval.union_insert(image_offset, image_length);
+    ldout(m_cct, 3) << "NITHYA : image_offset=" << image_offset << ",image_length=" << image_length  << dendl;
     }
 
     // ... and compute the difference between it and the image extents since
@@ -589,7 +612,7 @@ void ObjectCopyRequest<I>::merge_write_ops() {
     read_op.image_interval.subtract(intersection);
 
     for (auto& [image_offset, image_length] : read_op.image_interval) {
-      ldout(m_cct, 20) << "src_snap_seq=" << src_snap_seq << ", "
+      ldout(m_cct, 3) << "NITHYA: src_snap_seq=" << src_snap_seq << ", "
                        << "inserting sparse-read zero " << image_offset << "~"
                        << image_length << dendl;
       m_dst_zero_interval[src_snap_seq].union_insert(
@@ -604,7 +627,7 @@ void ObjectCopyRequest<I>::merge_write_ops() {
                                        image_length, m_image_area,
                                        buffer_offset, &object_extents);
       for (auto& object_extent : object_extents) {
-        ldout(m_cct, 20) << "src_snap_seq=" << src_snap_seq << ", "
+        ldout(m_cct, 3) << "NITHYA: src_snap_seq=" << src_snap_seq << ", "
                          << "object_offset=" << object_extent.offset << ", "
                          << "object_length=" << object_extent.length << dendl;
 
@@ -624,15 +647,19 @@ void ObjectCopyRequest<I>::merge_write_ops() {
 
 template <typename I>
 void ObjectCopyRequest<I>::compute_zero_ops() {
-  ldout(m_cct, 20) << dendl;
+  ldout(m_cct, 3) << dendl;
 
   m_src_image_ctx->image_lock.lock_shared();
   bool hide_parent = (m_src_snap_id_start == 0 &&
                       m_src_image_ctx->parent != nullptr);
+  bool is_clone = hide_parent;
+
   m_src_image_ctx->image_lock.unlock_shared();
 
   // ensure we have a zeroed interval for each snapshot
+  ldout(m_cct, 3) << "NITHYA(1) : m_src_snap_id_start=" << m_src_snap_id_start  << dendl;
   for (auto& [src_snap_seq, _] : m_snap_map) {
+    ldout(m_cct, 3) << "NITHYA(1) : src_snap_seq=" << src_snap_seq  << dendl;
     if (m_src_snap_id_start < src_snap_seq) {
       m_dst_zero_interval[src_snap_seq];
     }
@@ -658,7 +685,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
     auto dst_may_exist_it = m_dst_object_may_exist.find(dst_snap_seq);
     ceph_assert(dst_may_exist_it != m_dst_object_may_exist.end());
     if (!dst_may_exist_it->second && object_exists) {
-      ldout(m_cct, 5) << "object DNE for snap_id: " << dst_snap_seq << dendl;
+      ldout(m_cct, 3) << "object DNE for snap_id: " << dst_snap_seq << dendl;
       m_snapshot_sparse_bufferlist[src_snap_seq].insert(
         0, m_dst_image_ctx->layout.object_size,
         {io::SPARSE_EXTENT_STATE_ZEROED, m_dst_image_ctx->layout.object_size});
@@ -681,7 +708,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
             parent_extents, m_image_area, raw_overlap, false);
       }
       if (object_overlap == 0) {
-        ldout(m_cct, 20) << "no parent overlap" << dendl;
+        ldout(m_cct, 3) << "no parent overlap" << dendl;
         hide_parent = false;
       }
     }
@@ -703,7 +730,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
         switch (state) {
         case io::SPARSE_EXTENT_STATE_ZEROED:
           if (write_read_snap_ids != io::INITIAL_WRITE_READ_SNAP_IDS) {
-            ldout(m_cct, 20) << "zeroed extent: "
+            ldout(m_cct, 3) << "zeroed extent: "
                              << "src_snap_seq=" << src_snap_seq << " "
                              << image_interval.get_off() << "~"
                              << image_interval.get_len() << dendl;
@@ -711,7 +738,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
               image_interval.get_off(), image_interval.get_len());
           } else if (hide_parent &&
                      write_read_snap_ids == io::INITIAL_WRITE_READ_SNAP_IDS) {
-            ldout(m_cct, 20) << "zeroed (hide parent) extent: "
+            ldout(m_cct, 3) << "zeroed (hide parent) extent: "
                              << "src_snap_seq=" << src_snap_seq << "  "
                              << image_interval.get_off() << "~"
                              << image_interval.get_len() << dendl;
@@ -746,7 +773,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
       }
     }
 
-    ldout(m_cct, 20) << "src_snap_seq=" << src_snap_seq << ", "
+    ldout(m_cct, 3) << "src_snap_seq=" << src_snap_seq << ", "
                      << "dst_snap_seq=" << dst_snap_seq << ", "
                      << "zero_interval=" << zero_interval << ", "
                      << "end_size=" << end_size << dendl;
@@ -760,11 +787,13 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
         ceph_assert(object_extent.offset + object_extent.length <=
                       m_dst_image_ctx->layout.object_size);
 
+        ldout(m_cct, 3) << "NITHYA: object_extent.offset " << object_extent.offset << ", prev_end_size: " << prev_end_size << dendl;
         if (object_extent.offset + object_extent.length >= end_size) {
           // zero interval at the object end
-          if ((object_extent.offset == 0 && hide_parent) ||
+          if ((object_extent.offset == 0 &&
+		(!is_clone || hide_parent)) ||
               (object_extent.offset < prev_end_size)) {
-            ldout(m_cct, 20) << "truncate " << object_extent.offset
+            ldout(m_cct, 3) << "truncate " << object_extent.offset
                              << dendl;
             auto length =
               m_dst_image_ctx->layout.object_size - object_extent.offset;
@@ -777,7 +806,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
           end_size = std::min(end_size, object_extent.offset);
         } else {
           // zero interval inside the object
-          ldout(m_cct, 20) << "zero "
+          ldout(m_cct, 3) << "zero "
                            << object_extent.offset << "~"
                            << object_extent.length << dendl;
           m_snapshot_sparse_bufferlist[src_snap_seq].insert(
@@ -797,7 +826,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
       m_dst_object_state[src_snap_seq] = dst_object_map_state;
     }
 
-    ldout(m_cct, 20) << "dst_snap_seq=" << dst_snap_seq << ", "
+    ldout(m_cct, 3) << "dst_snap_seq=" << dst_snap_seq << ", "
                      << "end_size=" << end_size << ", "
                      << "dst_object_map_state="
                      << static_cast<uint32_t>(dst_object_map_state) << dendl;
@@ -831,7 +860,7 @@ void ObjectCopyRequest<I>::compute_dst_object_may_exist() {
       (m_dst_object_number < m_dst_image_ctx->get_object_count(snap_id));
   }
 
-  ldout(m_cct, 20) << "dst_object_may_exist=" << m_dst_object_may_exist
+  ldout(m_cct, 3) << "dst_object_may_exist=" << m_dst_object_may_exist
                    << dendl;
 }
 

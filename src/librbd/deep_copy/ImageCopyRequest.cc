@@ -124,6 +124,24 @@ void ImageCopyRequest<I>::handle_compute_diff(int r) {
     m_object_diff_state.resize(0);
   }
 
+  //NITHYA : print m_object_diff_state
+  {
+    std::stringstream ss1;
+    Formatter *jf = new JSONFormatter(false);
+    ldout(m_cct, 3) << " NITHYA:  object diff state = " << m_object_diff_state << dendl;
+    m_object_diff_state.dump(jf);
+    jf->flush(ss1);
+    ldout(m_cct, 3) << " NITHYA:  object diff done : " << ss1.str() << dendl;
+
+  //  auto data = m_object_diff_state.get_data();
+    std::stringstream ss2;
+    ss2 << std::hex;
+
+    for (unsigned i = 0; i < m_object_diff_state.size(); ++i) {
+      ss2 << "  0x" << std::setfill('0') << std::setw(2) << (int)m_object_diff_state[i];
+    }
+    ldout(m_cct,3) << "NITHYA: Object map diff : " << ss2.str() << dendl;
+  }
   send_object_copies();
 }
 
@@ -195,6 +213,7 @@ void ImageCopyRequest<I>::send_next_object_copy() {
     map_src_objects(ono, &src_objects);
 
     for (auto src_ono : src_objects) {
+      ldout(m_cct, 20) << "NITHYA(1) : src_ono =" << src_ono << " object_diff_state= 0x" << std::setfill('0') << std::setw(2) << (int)object_diff_state << dendl;
       if (src_ono >= m_object_diff_state.size()) {
         object_diff_state = object_map::DIFF_STATE_DATA_UPDATED;
       } else {
@@ -206,7 +225,10 @@ void ImageCopyRequest<I>::send_next_object_copy() {
             (state == object_map::DIFF_STATE_DATA_UPDATED)) {
           object_diff_state = state;
         }
+//      ldout(m_cct, 20) << "NITHYA(2) : src_ono =" << src_ono << " object_diff_state= 0x" << std::setfill('0') << std::setw(2) << (int)object_diff_state << " state=0x" << dendl;
+      ldout(m_cct, 20) << "NITHYA(2) : src_ono =" << src_ono << " state=0x" << std::setfill('0') << std::setw(2) << (int)state << " object_diff_state=0x" << std::setfill('0') << std::setw(2) << (int)object_diff_state << dendl;
       }
+      ldout(m_cct, 20) << "NITHYA(3) : src_ono =" << src_ono << " object_diff_state= 0x" << std::setfill('0') << std::setw(2) << (int)object_diff_state << dendl;
     }
 
     if (object_diff_state == object_map::DIFF_STATE_HOLE) {

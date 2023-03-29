@@ -307,7 +307,10 @@ Shell::Action *Shell::find_action(const CommandSpec &command_spec,
   std::sort(actions.begin(), actions.end(), [](auto lhs, auto rhs) {
     return lhs->command_spec.size() > rhs->command_spec.size();
   });
-
+/*
+  for (Action *action : actions) {
+    std::cout << "Action = " << action->command_spec << std::endl;
+  }*/
   for (Action *action : actions) {
     if (action->command_spec.size() <= command_spec.size()) {
       if (std::equal(action->command_spec.begin(),

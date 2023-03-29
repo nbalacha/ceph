@@ -141,7 +141,21 @@ Context *RefreshRequest<I>::handle_load(int *ret_val) {
     send_invalidate();
     return nullptr;
   }
+    //NITHYA: print object map:
+    //{
+      std::stringstream ss1;
+      Formatter *jf = new JSONFormatter(false);
+      ldout(cct, 3) << this << " " << __func__ << " NITHYA:  object map = " << m_on_disk_object_map << dendl;
+      m_on_disk_object_map.dump(jf);
+      jf->flush(std::cout);
+      jf->flush(ss1);
 
+      std::stringstream ss2;
+      for (unsigned i = 0; i < m_on_disk_object_map.size(); ++i) {
+       ss2 << "  0x" << std::hex << std::setfill('0') << std::setw(2) << m_on_disk_object_map[i];
+      }
+      ldout(cct,3) << "NITHYA: objectmap : " << ss2.str()  << dendl;
+   // }
   if (m_on_disk_object_map.size() < m_object_count) {
     lderr(cct) << "object map smaller than current object count: "
                << m_on_disk_object_map.size() << " != "
