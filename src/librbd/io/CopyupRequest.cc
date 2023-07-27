@@ -170,6 +170,7 @@ void CopyupRequest<I>::read_from_parent() {
       [this]() { handle_read_from_parent(-ENOENT); });
     return;
   } else if (is_deep_copy()) {
+    ldout(cct, 2) << "NITHYA: is_deep_copy =  true" << dendl; 
     deep_copy();
     return;
   }

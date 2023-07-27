@@ -817,6 +817,9 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, Remove) {
                            m_dst_snap_ids[1], is_fast_diff(mock_dst_image_ctx) ?
                            OBJECT_EXISTS_CLEAN : OBJECT_EXISTS, 0);
 
+  expect_start_op(mock_exclusive_lock);
+  expect_update_object_map(mock_dst_image_ctx, mock_object_map,
+                           m_dst_snap_ids[2], OBJECT_NONEXISTENT, 0);
   expect_prepare_copyup(mock_dst_image_ctx);
   expect_start_op(mock_exclusive_lock);
   expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0);
