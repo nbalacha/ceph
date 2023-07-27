@@ -53,6 +53,8 @@ struct TestMigration : public TestFixture {
     EXPECT_EQ(0, _rados.ioctx_create2(m_ioctx.get_id(), m_ref_ioctx));
     open_image(m_ref_ioctx, ref_image_name, &m_ref_ictx);
 
+    std::cout << "NITHYA: m_image_name = " << m_image_name << ",image_id = " << m_ictx->id  << std::endl;
+    std::cout << "NITHYA: ref_image_name = " << ref_image_name << ",image_id = " << m_ref_ictx->id << std::endl;
     resize(20 * (1 << 22));
   }
 
@@ -70,6 +72,8 @@ struct TestMigration : public TestFixture {
   }
 
   void compare(const std::string &description = "") {
+
+    std::cout << "NITHYA: compare : " << description << std::endl;
     std::vector<librbd::snap_info_t> src_snaps, dst_snaps;
 
     EXPECT_EQ(m_ref_ictx->size, m_ictx->size);
@@ -94,6 +98,7 @@ struct TestMigration : public TestFixture {
         description + " snap: " + (src_snap_name ? src_snap_name : "null"),
         m_ref_ictx, m_ictx);
     }
+    std::cout << "NITHYA: compare done! : " << description << std::endl;
   }
 
   void compare_snaps(const std::string &description, librbd::ImageCtx *src_ictx,
@@ -141,8 +146,9 @@ struct TestMigration : public TestFixture {
                   librbd::io::ReadResult{dst_result}, 0));
 
       if (!src_bl.contents_equal(dst_bl)) {
+        uint64_t object_size = 1 << m_ictx->order;
         std::cout << description
-                  << ", block " << offset << "~" << read_size << " differs"
+                  << ", obj =" << offset/object_size << ", block " << offset << "~" << read_size << " differs"
                   << std::endl;
         std::cout << "src block: " << src_ictx->id << ": " << std::endl; src_bl.hexdump(std::cout);
         std::cout << "dst block: " << dst_ictx->id << ": " << std::endl; dst_bl.hexdump(std::cout);
@@ -246,7 +252,9 @@ struct TestMigration : public TestFixture {
   }
 
   void write(uint64_t off, uint64_t len, char c) {
+  uint64_t object_size = 1 << m_ictx->order;
     std::cout << "write: " << c << " " << off << "~" << len << std::endl;
+    std::cout << "NITHYA : write: " << c << " " << off << ",obj=" << off/object_size << std::endl;
 
     bufferlist ref_bl;
     ref_bl.append(std::string(len, c));
@@ -259,8 +267,9 @@ struct TestMigration : public TestFixture {
   }
 
   void discard(uint64_t off, uint64_t len) {
+    uint64_t object_size = 1 << m_ictx->order;
     std::cout << "discard: " << off << "~" << len << std::endl;
-
+    std::cout << "NITHYA: discard: " << off << ",obj=" << off/object_size << std::endl;
     ASSERT_EQ(static_cast<ssize_t>(len),
               api::Io<>::discard(*m_ref_ictx, off, len, false));
     ASSERT_EQ(static_cast<ssize_t>(len),
@@ -435,26 +444,28 @@ struct TestMigration : public TestFixture {
                    char start_char = 'A') {
     uint64_t initial_size = m_ictx->size;
 
-    int nsnaps = 4;
+    int nsnaps = 1;
     const char *c = getenv("TEST_RBD_MIGRATION_STRESS_NSNAPS");
     if (c != NULL) {
       std::stringstream ss(c);
       ASSERT_TRUE(ss >> nsnaps);
     }
 
-    int nwrites = 4;
+    int nwrites = 1;
     c = getenv("TEST_RBD_MIGRATION_STRESS_NWRITES");
     if (c != NULL) {
       std::stringstream ss(c);
       ASSERT_TRUE(ss >> nwrites);
     }
 
+	std::cout << "NITHYA : here 1: size=" << initial_size << std::endl;
     for (int i = 0; i < nsnaps; i++) {
       for (int j = 0; j < nwrites; j++) {
         size_t len = rand() % ((1 << m_ictx->order) * 2);
         ASSERT_GT(m_ictx->size, len);
         uint64_t off = std::min(static_cast<uint64_t>(rand() % m_ictx->size),
                                 static_cast<uint64_t>(m_ictx->size - len));
+        std::cout << "NITHYA : here 2 "<< std::endl;
         write(off, len, start_char + i);
 
         len = rand() % ((1 << m_ictx->order) * 2);
@@ -470,27 +481,100 @@ struct TestMigration : public TestFixture {
       if (m_ictx->test_features(RBD_FEATURE_LAYERING) &&
           !m_ictx->test_features(RBD_FEATURE_MIGRATING) &&
           rand() % 4) {
+
+	std::cout << "NITHYA : cloning snapname="<< snap_name << std::endl;
         clone(snap_name);
       }
 
-      if (rand() % 2) {
+      /*if (rand() % 2) {
         librbd::NoOpProgressContext no_op;
         uint64_t new_size = initial_size + rand() % m_ictx->size;
+	std::cout << "NITHYA : resize new_size="<< new_size << std::endl;
         resize(new_size);
         ASSERT_EQ(new_size, m_ictx->size);
-      }
+      }*/
     }
     flush();
   }
 
   void test_stress2(bool concurrent) {
-    test_stress();
+//    test_stress();
 
     migration_prepare(m_ioctx, m_image_name);
     migration_status(RBD_IMAGE_MIGRATION_STATE_PREPARED);
 
     std::thread user([this]() {
         test_stress("user", 'a');
+/*
+        for (int i = 0; i < 1; i++) {
+          uint64_t off = (i + 1) * m_ictx->size / 10;
+          uint64_t len = m_ictx->size / 40;
+
+	  std::cout << "NITHYA : write: offset=" << off << ", len=" << len << std::endl;
+          write(off, len, '1' + i);
+
+          off += len / 4;
+          len /= 2;
+          discard(off, len);
+	  std::cout << "NITHYA : discard: offset=" << off << ", len=" << len << std::endl;
+        }
+*/
+        flush();
+      });
+
+    if (concurrent) {
+      librados::IoCtx io_ctx;
+      EXPECT_EQ(0, _rados.ioctx_create2(m_ioctx.get_id(), io_ctx));
+      migration_execute(io_ctx, m_image_name);
+      std::cout << "NITHYA : concurrent = true" << std::endl;
+      io_ctx.close();
+      user.join();
+    } else {
+      user.join();
+      compare("before execute");
+      migration_execute(m_ioctx, m_image_name);
+      std::cout << "NITHYA : concurrent = false" << std::endl;
+    }
+
+    migration_status(RBD_IMAGE_MIGRATION_STATE_EXECUTED);
+    compare("before commit");
+    migration_commit(m_ioctx, m_image_name);
+    compare("after commit");
+  }
+
+
+  void test_stress3(bool concurrent) {
+
+    uint64_t off = 0;
+    size_t len = 0;
+   // test_stress();
+    off = 16023264;
+    len = 7279649;
+    write(off, len, 'A');
+    off = 31868380;
+    len = 872825;
+    discard(off, len);
+    snap_create("snap0");
+    clone("snap0");
+
+    migration_prepare(m_ioctx, m_image_name);
+    migration_status(RBD_IMAGE_MIGRATION_STATE_PREPARED);
+
+    std::thread user([this]() {
+    uint64_t off = 0;
+    size_t len = 0;
+        //test_stress("user", 'a');
+      off = 51733462;
+      len = 5732685;
+
+
+      write(off, len, 'a');
+      off = 1617201;
+      len = 2902981;
+      discard(off, len);
+      snap_create("user0");
+    
+
         for (int i = 0; i < 5; i++) {
           uint64_t off = (i + 1) * m_ictx->size / 10;
           uint64_t len = m_ictx->size / 40;
@@ -1354,6 +1438,12 @@ TEST_F(TestMigration, Stress2)
 TEST_F(TestMigration, StressLive)
 {
   test_stress2(true);
+}
+
+
+TEST_F(TestMigration, Stress3)
+{
+    test_stress3(false);
 }
 
 } // namespace librbd

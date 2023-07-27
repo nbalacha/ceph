@@ -226,6 +226,7 @@ void ObjectReadRequest<I>::read_object() {
   if (read_snap_id == image_ctx->snap_id &&
       image_ctx->object_map != nullptr &&
       !image_ctx->object_map->object_may_exist(this->m_object_no)) {
+    ldout(image_ctx->cct, 2) << "NITHYA: obj=" << this->m_object_no << " does not exist, snap_id=" << read_snap_id << dendl;
     image_ctx->asio_engine->post([this]() { read_parent(); });
     return;
   }
@@ -370,7 +371,6 @@ AbstractObjectWriteRequest<I>::AbstractObjectWriteRequest(
       this->m_object_len == ictx->get_object_size()) {
     m_full_object = true;
   }
-
   compute_parent_info();
 
   ictx->image_lock.lock_shared();
@@ -387,12 +387,19 @@ void AbstractObjectWriteRequest<I>::compute_parent_info() {
 
   this->compute_parent_extents(&m_parent_extents, &m_image_area, false);
 
+  ldout(image_ctx->cct, 1) << "NITHYA: migrate m_parent_extents" << m_parent_extents << dendl;
+
   if (!this->has_parent() ||
       (m_full_object &&
        !this->m_io_context->get_write_snap_context() &&
        !is_post_copyup_write_required())) {
+        ldout(image_ctx->cct, 1) << "NITHYA: migrate copy_up disabled" << dendl;
+
     m_copyup_enabled = false;
+  } else {
+    ldout(image_ctx->cct, 1) << "NITHYA: migrate copy_up enabled" << dendl;
   }
+
 }
 
 template <typename I>
@@ -423,7 +430,7 @@ void AbstractObjectWriteRequest<I>::send() {
         this->m_object_no);
     }
   }
-
+ldout(image_ctx->cct, 1) << "NITHYA: migrate write send: m_object_may_exist=" << m_object_may_exist << dendl;
   if (!m_object_may_exist && is_no_op_for_nonexistent_object()) {
     ldout(image_ctx->cct, 20) << "skipping no-op on nonexistent object"
                               << dendl;
@@ -441,12 +448,14 @@ void AbstractObjectWriteRequest<I>::pre_write_object_map_update() {
   image_ctx->image_lock.lock_shared();
   if (image_ctx->object_map == nullptr || !is_object_map_update_enabled()) {
     image_ctx->image_lock.unlock_shared();
+    ldout(image_ctx->cct, 1) << "NITHYA: migrate here 1" << dendl;
     write_object();
     return;
   }
 
   if (!m_object_may_exist && m_copyup_enabled) {
     // optimization: copyup required
+ldout(image_ctx->cct, 1) << "NITHYA: migrate here 2 - copyup required" << dendl;
     image_ctx->image_lock.unlock_shared();
     copyup();
     return;
@@ -472,7 +481,7 @@ void AbstractObjectWriteRequest<I>::pre_write_object_map_update() {
 template <typename I>
 void AbstractObjectWriteRequest<I>::handle_pre_write_object_map_update(int r) {
   I *image_ctx = this->m_ictx;
-  ldout(image_ctx->cct, 20) << "r=" << r << dendl;
+  ldout(image_ctx->cct, 20) << "r=" << r << ", obj_no=" << this->m_object_no <<  dendl;
   if (r < 0) {
     lderr(image_ctx->cct) << "failed to update object map: "
                           << cpp_strerror(r) << dendl;

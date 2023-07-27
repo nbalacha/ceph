@@ -42,7 +42,7 @@ public:
     I &image_ctx = this->m_image_ctx;
     ceph_assert(ceph_mutex_is_locked(image_ctx.owner_lock));
     CephContext *cct = image_ctx.cct;
-
+ldout(cct, 1) << "NITHYA: migrate here 1" << dendl;
     if (image_ctx.exclusive_lock != nullptr &&
         !image_ctx.exclusive_lock->is_lock_owner()) {
       ldout(cct, 1) << "lost exclusive lock during migrate" << dendl;
@@ -70,6 +70,7 @@ private:
     m_async_op->start_op(image_ctx);
 
     if (!image_ctx.io_image_dispatcher->writes_blocked()) {
+      ldout(cct, 1) << "NITHYA: migrate here 1" << dendl;
       migrate_object();
       return;
     }
@@ -78,6 +79,7 @@ private:
       image_ctx, create_context_callback<
         C_MigrateObject<I>, &C_MigrateObject<I>::handle_start_async_op>(this));
     m_async_op->finish_op();
+    ldout(cct, 1) << "NITHYA: migrate here 2" << dendl;
     delete m_async_op;
     m_async_op = nullptr;
     image_ctx.io_image_dispatcher->wait_on_writes_unblocked(ctx);
@@ -93,16 +95,19 @@ private:
       this->complete(r);
       return;
     }
-
+ldout(cct, 1) << "NITHYA: migrate here 1" << dendl;
     std::shared_lock owner_locker{image_ctx.owner_lock};
     start_async_op();
   }
 
   bool is_within_overlap_bounds() {
     I &image_ctx = this->m_image_ctx;
+    CephContext *cct = image_ctx.cct;
     std::shared_lock image_locker{image_ctx.image_lock};
 
     auto overlap = std::min(image_ctx.size, image_ctx.migration_info.overlap);
+    ldout(cct, 1) << "NITHYA: migrate here 1 size = " << image_ctx.size << ",overlap=" << image_ctx.migration_info.overlap << dendl;
+    ldout(cct, 1) << "NITHYA: migrate here 1 overlap = " << overlap << dendl;
     return overlap > 0 &&
       Striper::get_num_objects(image_ctx.layout, overlap) > m_object_no;
   }
@@ -123,6 +128,7 @@ private:
 
       ldout(cct, 20) << "copyup object req " << req << ", object_no "
                      << m_object_no << dendl;
+      ldout(cct, 1) << "NITHYA: migrate here 1" << dendl;
 
       req->send();
     } else {
@@ -136,7 +142,7 @@ private:
       auto req = deep_copy::ObjectCopyRequest<I>::create(
         image_ctx.parent, &image_ctx, 0, 0, image_ctx.migration_info.snap_map,
         m_object_no, flags, nullptr, ctx);
-
+ldout(cct, 1) << "NITHYA: migrate here 2" << dendl;
       ldout(cct, 20) << "deep copy object req " << req << ", object_no "
                      << m_object_no << dendl;
       req->send();
@@ -148,6 +154,8 @@ private:
     ldout(cct, 10) << "r=" << r << dendl;
 
     if (r == -ENOENT) {
+     ldout(cct, 1) << "NITHYA: migrate here 1 : m_object_no=" << m_object_no << dendl;
+ 
       r = 0;
     }
 

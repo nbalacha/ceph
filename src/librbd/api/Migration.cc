@@ -252,6 +252,7 @@ int open_images(librados::IoCtx& io_ctx, const std::string &image_name,
     return r;
   }
 
+//NITHYA: Try this out : read the rbd header obj and check the values.
   ldout(cct, 10) << "migration spec: " << migration_spec << dendl;
   if (migration_spec.header_type == cls::rbd::MIGRATION_HEADER_TYPE_SRC) {
     ldout(cct, 10) << "the source image is opened" << dendl;
@@ -265,7 +266,7 @@ int open_images(librados::IoCtx& io_ctx, const std::string &image_name,
     image_ctx->state->close();
     image_ctx = I::create(image_name, image_id, nullptr, io_ctx, false);
 
-    if (!skip_open_dst_image) {
+    if (!skip_open_dst_image) { //NITHYA: why?
       ldout(cct, 10) << "re-opening the destination image" << dendl;
       r = image_ctx->state->open(0);
       if (r < 0) {
@@ -1285,6 +1286,8 @@ int Migration<I>::validate_src_snaps(I* image_ctx) {
     return r;
   }
 
+// NITHYA: Gets the list of src snaps, checks if any of them have children (clones)
+
   uint64_t dst_features = 0;
   r = m_image_options.get(RBD_IMAGE_OPTION_FEATURES, &dst_features);
   ceph_assert(r == 0);
@@ -1499,6 +1502,7 @@ int Migration<I>::create_dst_image(I** image_ctx) {
       m_src_image_ctx->op_work_queue, &on_create);
     req->send();
   } else {
+    // If the src image is a clone, create a clone for the dst image
     r = util::create_ioctx(m_src_image_ctx->md_ctx, "parent image",
                            parent_spec.pool_id, parent_spec.pool_namespace,
                            &parent_io_ctx);
