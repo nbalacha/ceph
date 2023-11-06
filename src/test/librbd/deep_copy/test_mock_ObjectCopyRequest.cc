@@ -21,6 +21,33 @@
 #include "test/librbd/mock/MockImageCtx.h"
 #include "test/librbd/test_support.h"
 
+/* ObjectCopyRequest call sequence
+
+   * <start>
+   *    |
+   *    v
+   * LIST_SNAPS
+   *    |
+   *    |/---------\
+   *    |          | (repeat for each snapshot)
+   *    v          |
+   * READ ---------/
+   *    |
+   *    |     /-----------\
+   *    |     |           | (repeat for each snapshot)
+   *    v     v           |
+   * UPDATE_OBJECT_MAP ---/ (skip if object
+   *    |                    map disabled)
+   *    |     /-----------\
+   *    |     |           | (repeat for each snapshot)
+   *    v     v           |
+   * WRITE_OBJECT --------/
+   *    |
+   *    v
+   * <finish>
+   * 
+   * 
+   */
 namespace librbd {
 namespace {
 
@@ -66,6 +93,12 @@ std::pair<Extents, ImageArea> object_to_area_extents(
   return {std::move(extents), ImageArea::DATA};
 }
 
+template <>
+bool trigger_copyup(MockTestImageCtx* image_ctx, uint64_t object_no, IOContext io_context,
+                    Context* on_finish) {
+  return false;
+}
+
 } // namespace util
 } // namespace io
 
@@ -98,7 +131,7 @@ void scribble(librbd::ImageCtx *image_ctx, int num_ops, size_t max_size,
 {
   uint64_t object_size = 1 << image_ctx->order;
   for (int i = 0; i < num_ops; i++) {
-    uint64_t off = rand() % (object_size - max_size + 1);
+    uint64_t off = rand() % (object_size - max_size + 1);  // This will always write less than the object size
     uint64_t len = 1 + rand() % max_size;
     std::cout << __func__ << ": off=" << off << ", len=" << len << std::endl;
 
@@ -123,6 +156,7 @@ MATCHER(IsListSnaps, "") {
   return (req != nullptr);
 }
 
+// Compares the arg to the call with the statements here
 MATCHER_P2(IsRead, snap_id, image_interval, "") {
   auto req = boost::get<io::ImageDispatchSpec::Read>(&arg->request);
   if (req == nullptr ||
@@ -164,7 +198,7 @@ public:
     ASSERT_EQ(0, open_image(m_image_name, &m_src_image_ctx));
 
     librbd::NoOpProgressContext no_op;
-    m_image_size = 1 << m_src_image_ctx->order;
+    m_image_size = 1 << m_src_image_ctx->order;  // Image size will be 4MB (1 object)
     ASSERT_EQ(0, m_src_image_ctx->operations->resize(m_image_size, true, no_op));
 
     librbd::RBD rbd;
@@ -191,7 +225,8 @@ public:
 
   void expect_get_object_count(librbd::MockImageCtx& mock_image_ctx) {
     EXPECT_CALL(mock_image_ctx, get_object_count(_))
-      .WillRepeatedly(Invoke([&mock_image_ctx](librados::snap_t snap_id) {
+      .WillRepeatedly(Invoke([&mock_image_ctx](librados::snap_t snap_id) { //Which snap_id? Whatever is passed by the actual call?
+      // Or the mock_image_ctx.snap_id?
           return mock_image_ctx.image_ctx->get_object_count(snap_id);
         }));
   }
@@ -206,11 +241,12 @@ public:
   void expect_start_op(librbd::MockExclusiveLock &mock_exclusive_lock) {
     if ((m_src_image_ctx->features & RBD_FEATURE_EXCLUSIVE_LOCK) == 0) {
       return;
-    }
+    } // Because the MockExclusiveLock.start_op is mocked?
     EXPECT_CALL(mock_exclusive_lock, start_op(_)).WillOnce(Return(new LambdaContext([](int){})));
   }
 
   void expect_list_snaps(librbd::MockTestImageCtx &mock_image_ctx, int r) {
+    // Expects mock_image_ctx.io_image_dispatcher->send() to be called where req is type listsnaps
     EXPECT_CALL(*mock_image_ctx.io_image_dispatcher, send(IsListSnaps()))
       .WillOnce(Invoke(
         [&mock_image_ctx, r](io::ImageDispatchSpec* spec) {
@@ -524,7 +560,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, DNE) {
                                                   CEPH_NOSNAP, 0, 0, &ctx);
 
   InSequence seq;
-  expect_list_snaps(mock_src_image_ctx, -ENOENT);
+  expect_list_snaps(mock_src_image_ctx, -ENOENT);  // No writes to the image so object does not exist. 
 
   request->send();
   ASSERT_EQ(-ENOENT, ctx.wait());
@@ -533,7 +569,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, DNE) {
 TEST_F(TestMockDeepCopyObjectCopyRequest, Write) {
   // scribble some data
   interval_set<uint64_t> one;
-  scribble(m_src_image_ctx, 10, 102400, &one);
+  scribble(m_src_image_ctx, 10, 102400, &one); //Scribble will always write less than the object size.
 
   ASSERT_EQ(0, create_snap("copy"));
   librbd::MockTestImageCtx mock_src_image_ctx(*m_src_image_ctx);
@@ -559,13 +595,13 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, Write) {
 
   InSequence seq;
   expect_list_snaps(mock_src_image_ctx, 0);
-  expect_read(mock_src_image_ctx, m_src_snap_ids[0], 0, one.range_end(), 0);
-  expect_start_op(mock_exclusive_lock);
-  expect_update_object_map(mock_dst_image_ctx, mock_object_map,
+  expect_read(mock_src_image_ctx, m_src_snap_ids[0], 0, one.range_end(), 0); //<-- Shouldn't this be CEPH_NOSNAP?
+  expect_start_op(mock_exclusive_lock);  // ObjectCopyRequest locks dst_image_ctx in send_update_object_map
+  expect_update_object_map(mock_dst_image_ctx, mock_object_map,   
                            m_dst_snap_ids[0], OBJECT_EXISTS, 0);
-  expect_prepare_copyup(mock_dst_image_ctx);
-  expect_start_op(mock_exclusive_lock);
-  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0);
+  expect_prepare_copyup(mock_dst_image_ctx); 
+  expect_start_op(mock_exclusive_lock);  // ObjectCopyRequest locks dst_image_cstx in send_write
+  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0); //<-- rados write op
 
   request->send();
   ASSERT_EQ(0, ctx.wait());
@@ -588,8 +624,8 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, ReadError) {
   mock_dst_image_ctx.object_map = &mock_object_map;
 
   expect_op_work_queue(mock_src_image_ctx);
-  expect_test_features(mock_dst_image_ctx);
-  expect_get_object_count(mock_dst_image_ctx);
+  expect_test_features(mock_dst_image_ctx);  //WillRepeatedly
+  expect_get_object_count(mock_dst_image_ctx); //WillRepeatedly
 
   C_SaferCond ctx;
   MockObjectCopyRequest *request = create_request(mock_src_image_ctx,
@@ -642,7 +678,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, WriteError) {
 
   expect_prepare_copyup(mock_dst_image_ctx);
   expect_start_op(mock_exclusive_lock);
-  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, -EINVAL);
+  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, -EINVAL); // Expect an error
 
   request->send();
   ASSERT_EQ(-EINVAL, ctx.wait());
@@ -658,7 +694,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, WriteSnaps) {
   scribble(m_src_image_ctx, 10, 102400, &two);
   ASSERT_EQ(0, create_snap("two"));
 
-  if (one.range_end() < two.range_end()) {
+  if (one.range_end() < two.range_end()) {  //???
     interval_set<uint64_t> resize_diff;
     resize_diff.insert(one.range_end(), two.range_end() - one.range_end());
     two.union_of(resize_diff);
@@ -723,7 +759,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, Trim) {
   ASSERT_EQ(0, create_snap("one"));
 
   // trim the object
-  uint64_t trim_offset = rand() % one.range_end();
+  uint64_t trim_offset = rand() % one.range_end(); // offset < than last written byte
   ASSERT_LE(0, api::Io<>::discard(
     *m_src_image_ctx, trim_offset, one.range_end() - trim_offset,
     m_src_image_ctx->discard_granularity_bytes));
@@ -761,7 +797,7 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, Trim) {
                            m_dst_snap_ids[1], OBJECT_EXISTS, 0);
   expect_prepare_copyup(mock_dst_image_ctx);
   expect_start_op(mock_exclusive_lock);
-  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0);
+  expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0);  // Check this
   expect_start_op(mock_exclusive_lock);
   expect_truncate(mock_dst_io_ctx, trim_offset, 0);
 
@@ -815,11 +851,11 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, Remove) {
   expect_start_op(mock_exclusive_lock);
   expect_update_object_map(mock_dst_image_ctx, mock_object_map,
                            m_dst_snap_ids[1], is_fast_diff(mock_dst_image_ctx) ?
-                           OBJECT_EXISTS_CLEAN : OBJECT_EXISTS, 0);
+                           OBJECT_EXISTS_CLEAN : OBJECT_EXISTS, 0); //No change to the object in snap "two"
 
   expect_start_op(mock_exclusive_lock);
   expect_update_object_map(mock_dst_image_ctx, mock_object_map,
-                           m_dst_snap_ids[2], OBJECT_NONEXISTENT, 0);
+                           m_dst_snap_ids[2], OBJECT_NONEXISTENT, 0); //object removed in snap "copy"
   expect_prepare_copyup(mock_dst_image_ctx);
   expect_start_op(mock_exclusive_lock);
   expect_write(mock_dst_io_ctx, 0, one.range_end(), {0, {}}, 0);
@@ -1087,7 +1123,8 @@ TEST_F(TestMockDeepCopyObjectCopyRequest, SkipSnapList) {
 
   InSequence seq;
 
-  // clean (no-updates) snapshots
+  // clean (no-updates) snapshots so object map diffs return no changes and 
+  // hence list_snaps is not sent.
   ASSERT_EQ(0, create_snap("snap2"));
   mock_dst_image_ctx.snaps = m_dst_image_ctx->snaps;
 

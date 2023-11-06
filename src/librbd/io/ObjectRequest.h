@@ -475,6 +475,7 @@ private:
   SnapIds m_snap_ids;
   int m_list_snaps_flags;
   SnapshotDelta* m_snapshot_delta;
+  
 
   neorados::SnapSet m_snap_set;
   boost::system::error_code m_ec;

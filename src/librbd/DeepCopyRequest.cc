@@ -65,6 +65,7 @@ void DeepCopyRequest<I>::send() {
     return;
   }
 
+// NITHYA: Check if non-zero src and dst snapids are present in imagectx->snap_info
   int r = validate_copy_points();
   if (r < 0) {
     finish(r);

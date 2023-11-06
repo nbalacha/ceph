@@ -49,6 +49,10 @@ void compute_snap_map(CephContext* cct,
     (*snap_map)[it.first] = snap_ids;
   }
 
+// NITHYA : Example :
+// snap_seqs={56=62,57=63,58=64,18446744073709551614=18446744073709551614}, 
+// snap_map={56=[62],57=[63,62],58=[64,63,62],18446744073709551614=[18446744073709551614,64,63,62]}
+
   ldout(cct, 10) << "src_snap_id_start=" << src_snap_id_start << ", "
                  << "src_snap_id_end=" << src_snap_id_end << ", "
                  << "dst_snap_ids=" << dst_snap_ids << ", "

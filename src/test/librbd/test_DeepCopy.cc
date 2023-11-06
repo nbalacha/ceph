@@ -16,6 +16,75 @@ void register_test_deep_copy() {
 
 namespace librbd {
 
+template <typename ImageCtxT = librbd::ImageCtx>
+struct TestImage {
+int deep_copy(I *src, I *dest, 
+                  librados::snap_t src_snap_id_start,
+                  librados::snap_t src_snap_id_end,
+                  librados::snap_t dst_snap_id_start, ImageOptions& opts,
+                  ProgressContext &prog_ctx) {
+
+  CephContext *cct = (CephContext *)dest->cct;
+  // ensure previous writes are visible to dest
+  C_SaferCond flush_ctx;
+  {
+    std::shared_lock owner_locker{src->owner_lock};
+    auto aio_comp = io::AioCompletion::create_and_start(&flush_ctx, src,
+                                                        io::AIO_TYPE_FLUSH);
+    auto req = io::ImageDispatchSpec::create_flush(
+      *src, io::IMAGE_DISPATCH_LAYER_INTERNAL_START,
+      aio_comp, io::FLUSH_SOURCE_INTERNAL, {});
+    req->send();
+  }
+  int r = flush_ctx.wait();
+  if (r < 0) {
+    return r;
+  }
+
+  uint64_t flatten = 0;
+  if (opts.get(RBD_IMAGE_OPTION_FLATTEN, &flatten) == 0) {
+    opts.unset(RBD_IMAGE_OPTION_FLATTEN);
+  }
+  AsioEngine asio_engine(src->md_ctx);
+
+  C_SaferCond lock_ctx;
+  {
+    std::unique_lock locker{dest->owner_lock};
+
+    if (dest->exclusive_lock == nullptr ||
+        dest->exclusive_lock->is_lock_owner()) {
+      lock_ctx.complete(0);
+    } else {
+      dest->exclusive_lock->acquire_lock(&lock_ctx);
+    }
+  }
+
+  r = lock_ctx.wait();
+  if (r < 0) {
+    lderr(cct) << "failed to request exclusive lock: " << cpp_strerror(r)
+               << dendl;
+    dest->state->close();
+    return r;
+  }
+
+  C_SaferCond cond;
+  SnapSeqs snap_seqs;
+  deep_copy::ProgressHandler progress_handler{&prog_ctx};
+  auto req = DeepCopyRequest<I>::create(
+    src, dest, src_snap_id_start, src_snap_id_end, dst_snap_id_start, flatten, boost::none,
+    asio_engine.get_work_queue(), &snap_seqs, &progress_handler, &cond);
+  req->send();
+  r = cond.wait();
+  if (r < 0) {
+    return r;
+  }
+  return 0;
+}
+
+
+}
+
+
 struct TestDeepCopy : public TestFixture {
   void SetUp() override {
     TestFixture::SetUp();

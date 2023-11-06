@@ -233,7 +233,7 @@ void CopyupRequest<I>::handle_read_from_parent(int r) {
     finish(0);
     return;
   }
-
+  // NITHYA : What is it doing to snapshots?
   // copyup() will affect snapshots only if parent data is not all
   // zeros.
   if (!m_copyup_is_zero) {
