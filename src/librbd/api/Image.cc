@@ -702,7 +702,7 @@ int Image<I>::deep_copy(I *src, I *dest, bool flatten,
   librados::snap_t snap_id_end;
   {
     std::shared_lock image_locker{src->image_lock};
-    snap_id_end = src->snap_id;
+    snap_id_end = src->snap_id;  // NITHYA: Why not CEPH_NOSNAP?
   }
 
   AsioEngine asio_engine(src->md_ctx);

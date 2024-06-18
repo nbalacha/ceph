@@ -64,7 +64,7 @@ public:
                 MirrorStatusUpdater<ImageCtxT>* local_status_updater,
                 journal::CacheManagerHandler *cache_manager_handler,
                 PoolMetaCache* pool_meta_cache);
-  virtual ~ImageReplayer();
+  virtual ~ImageReplayer(); // NITHYA: Why?
   ImageReplayer(const ImageReplayer&) = delete;
   ImageReplayer& operator=(const ImageReplayer&) = delete;
 
@@ -148,7 +148,8 @@ protected:
 
 private:
   typedef std::set<Peer<ImageCtxT>> Peers;
-  typedef std::list<Context *> Contexts;
+  typedef std::list<Context *> Contexts; //NITHYA : what are these?
+
 
   enum State {
     STATE_UNKNOWN,

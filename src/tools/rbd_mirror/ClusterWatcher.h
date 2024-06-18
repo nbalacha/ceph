@@ -33,9 +33,10 @@ public:
     bool operator()(const PeerSpec& lhs, const PeerSpec& rhs) const {
       return (lhs.uuid < rhs.uuid);
     }
+    //NITHYA : What if lhs > rhs? Look into how set works.
   };
   typedef std::set<PeerSpec, PeerSpecCompare> Peers;
-  typedef std::map<int64_t, Peers>  PoolPeers;
+  typedef std::map<int64_t, Peers>  PoolPeers;  //Pool_id -> peers which is a set of PeerSpecs
 
   ClusterWatcher(RadosRef cluster, ceph::mutex &lock,
                  ServiceDaemon<librbd::ImageCtx>* service_daemon);

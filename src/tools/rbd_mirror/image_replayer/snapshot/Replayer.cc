@@ -568,7 +568,7 @@ void Replayer<I>::scan_local_mirror_snapshots(
     if (!m_local_mirror_snap_ns.is_primary() &&
         m_local_mirror_snap_ns.complete) {
       // our remote sync should start after this completed snapshot
-      m_remote_snap_id_start = m_local_mirror_snap_ns.primary_snap_id;
+      m_remote_snap_id_start = m_local_mirror_snap_ns.primary_snap_id; // NITHYA: Bug? Will be wrong if end != CEPH_NOSNAP
     }
   }
 
@@ -1042,6 +1042,9 @@ void Replayer<I>::handle_update_mirror_image_state(int r) {
 
   request_sync();
 }
+
+// NITHYA: Mechanism to get approval to copy the image from the throttler
+// Used to enforce the setting max_parallel_requests (rbd_mirror_concurrent_image_syncs)
 
 template <typename I>
 void Replayer<I>::request_sync() {

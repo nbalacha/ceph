@@ -500,7 +500,7 @@ Mirror::Mirror(CephContext *cct, const std::vector<const char*> &args) :
   m_args(args),
   m_local(new librados::Rados()),
   m_cache_manager_handler(new CacheManagerHandler(cct)),
-  m_pool_meta_cache(new PoolMetaCache(cct)),
+  m_pool_meta_cache(new PoolMetaCache(cct)), // NITHYA: Doesn't set values for this cache in this class?
   m_asok_hook(new MirrorAdminSocketHook(cct, this)) {
   dout(10) << "args=" << args << dendl;
 }
@@ -700,10 +700,25 @@ void Mirror::update_pool_replayers(const PoolPeers &pool_peers,
   dout(20) << "enter" << dendl;
   ceph_assert(ceph_mutex_is_locked(m_lock));
 
+  /*NITHYA : std::map<PoolPeer, std::unique_ptr<PoolReplayer<>>> m_pool_replayers;
+    typedef std::pair<int64_t, PeerSpec> PoolPeer;
+    typedef std::set<PeerSpec, PeerSpecCompare> Peers;
+    typedef std::map<int64_t, Peers>  PoolPeers;
+    struct PeerSpec {
+      std::string uuid;
+      std::string cluster_name;
+      std::string client_name;
+
+      /// optional config properties
+      std::string mon_host;
+      std::string key;
+    }
+  */
+
   // remove stale pool replayers before creating new pool replayers
   for (auto it = m_pool_replayers.begin(); it != m_pool_replayers.end();) {
-    auto &peer = it->first.second;
-    auto pool_peer_it = pool_peers.find(it->first.first);
+    auto &peer = it->first.second;  // NITHYA : PeerSpec
+    auto pool_peer_it = pool_peers.find(it->first.first); // NITHYA: it->first.first == pool_id
     if (pool_peer_it != pool_peers.end()) {
       // look up this pool replayer's peer by UUID
       auto peer_it = pool_peer_it->second.find(peer);
@@ -731,7 +746,7 @@ void Mirror::update_pool_replayers(const PoolPeers &pool_peers,
       if (pool_replayers_it != m_pool_replayers.end()) {
         auto& pool_replayer = pool_replayers_it->second;
         if (!m_site_name.empty() && !site_name.empty() &&
-            m_site_name != site_name) {
+            m_site_name != site_name) { //NITHYA : When can the site name change?
           dout(0) << "restarting pool replayer for " << peer << " due to "
                   << "updated site name" << dendl;
           // TODO: make async

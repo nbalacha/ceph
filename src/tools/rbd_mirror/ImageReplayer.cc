@@ -128,7 +128,7 @@ public:
 };
 
 template <typename I>
-class ImageReplayerAdminSocketHook : public AdminSocketHook {
+class ImageReplayerAdminSocketHook : public AdminSocketHook { //NITHYA: Who calls these?
 public:
   ImageReplayerAdminSocketHook(CephContext *cct, const std::string &name,
 			       ImageReplayer<I> *replayer)
@@ -226,15 +226,15 @@ ImageReplayer<I>::ImageReplayer(
   m_pool_meta_cache(pool_meta_cache),
   m_local_image_name(global_image_id),
   m_lock(ceph::make_mutex("rbd::mirror::ImageReplayer " +
-      stringify(local_io_ctx.get_id()) + " " + global_image_id)),
+      stringify(local_io_ctx.get_id()) + " " + global_image_id)), //NITHYA : This is the pool_id.
   m_progress_cxt(this),
   m_replayer_listener(new ReplayerListener(this))
 {
   // Register asok commands using a temporary "remote_pool_name/global_image_id"
   // name.  When the image name becomes known on start the asok commands will be
   // re-registered using "remote_pool_name/remote_image_name" name.
-
-  m_image_spec = image_replayer::util::compute_image_spec(
+// NITHYA: Why remote_pool_name?
+  m_image_spec = image_replayer::util::compute_image_spec( 
     local_io_ctx, global_image_id);
   register_admin_socket_hook();
 }
@@ -255,7 +255,7 @@ template <typename I>
 image_replayer::HealthState ImageReplayer<I>::get_health_state() const {
   std::lock_guard locker{m_lock};
 
-  if (!m_mirror_image_status_state) {
+  if (!m_mirror_image_status_state) { //NITHYA: Why???
     return image_replayer::HEALTH_STATE_OK;
   } else if (*m_mirror_image_status_state ==
                cls::rbd::MIRROR_IMAGE_STATUS_STATE_SYNCING ||

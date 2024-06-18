@@ -29,6 +29,7 @@ template <typename I> class AbstractObjectWriteRequest;
 template <typename ImageCtxT = librbd::ImageCtx>
 class CopyupRequest {
 public:
+//NITHYA image_extents is the parent overlap computed by the callers.
   static CopyupRequest* create(ImageCtxT *ictx, uint64_t objectno,
                                Extents &&image_extents, ImageArea area,
                                const ZTracer::Trace &parent_trace) {

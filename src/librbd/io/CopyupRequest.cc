@@ -169,7 +169,7 @@ void CopyupRequest<I>::read_from_parent() {
     m_image_ctx->asio_engine->post(
       [this]() { handle_read_from_parent(-ENOENT); });
     return;
-  } else if (is_deep_copy()) {
+  } else if (is_deep_copy()) { // NITHYA: The image is being migrated
     ldout(cct, 2) << "NITHYA: is_deep_copy =  true" << dendl; 
     deep_copy();
     return;
@@ -237,7 +237,7 @@ void CopyupRequest<I>::handle_read_from_parent(int r) {
   // copyup() will affect snapshots only if parent data is not all
   // zeros.
   if (!m_copyup_is_zero) {
-    m_snap_ids.insert(m_snap_ids.end(), m_image_ctx->snaps.rbegin(),
+    m_snap_ids.insert(m_snap_ids.end(), m_image_ctx->snaps.rbegin(), // NITHYA: reverse order?
                       m_image_ctx->snaps.rend());
   }
 
@@ -334,7 +334,7 @@ template <typename I>
 void CopyupRequest<I>::update_object_maps() {
   std::shared_lock owner_locker{m_image_ctx->owner_lock};
   std::shared_lock image_locker{m_image_ctx->image_lock};
-  if (m_image_ctx->object_map == nullptr) {
+  if (m_image_ctx->object_map == nullptr) { // The Object map feature is disabled
     image_locker.unlock();
     owner_locker.unlock();
 
@@ -350,12 +350,13 @@ void CopyupRequest<I>::update_object_maps() {
   if (copy_on_read && !m_snap_ids.empty() &&
       m_image_ctx->test_features(RBD_FEATURE_FAST_DIFF,
                                  m_image_ctx->image_lock)) {
-    // HEAD is non-dirty since data is tied to first snapshot
+    // HEAD is non-dirty since data is tied to first snapshot. 
+    // NITHYA: Why is this done for copy_on_read ?
     head_object_map_state = OBJECT_EXISTS_CLEAN;
   }
 
   auto r_it = m_pending_requests.rbegin();
-  if (r_it != m_pending_requests.rend()) {
+  if (r_it != m_pending_requests.rend()) { 
     // last write-op determines the final object map state
     head_object_map_state = (*r_it)->get_pre_write_object_map_state();
   }
@@ -415,7 +416,7 @@ void CopyupRequest<I>::copyup() {
   ldout(cct, 20) << dendl;
 
   bool copy_on_read = m_pending_requests.empty() && !m_deep_copied;
-  bool deep_copyup = !snapc.snaps.empty() && !m_copyup_is_zero;
+  bool deep_copyup = !snapc.snaps.empty() && !m_copyup_is_zero; // clone snaps exists + parent not empty
   if (m_copyup_is_zero) {
     m_copyup_data.clear();
     m_copyup_extent_map.clear();
@@ -587,7 +588,7 @@ bool CopyupRequest<I>::is_copyup_required() {
     return true;
   }
 
-  if (!m_copyup_is_zero) {
+  if (!m_copyup_is_zero) { // NITHYA : Check what happens if the parent data is 0s
     return true;
   }
 
@@ -717,7 +718,7 @@ int CopyupRequest<I>::prepare_copyup_data() {
     // copyup that will concurrently written to the HEAD revision with the
     // associated write-ops so only process partial extents
     uint64_t buffer_offset = 0;
-    for (auto [object_offset, object_length] : m_copyup_extent_map) {
+    for (auto [object_offset, object_length] : m_copyup_extent_map) { // NITHYA: When can this have more than one entry?? Stripe < obj size ?
       interval_set<uint64_t> copyup_object_extents;
       copyup_object_extents.insert(object_offset, object_length);
 

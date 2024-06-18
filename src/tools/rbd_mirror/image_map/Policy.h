@@ -84,7 +84,7 @@ private:
     boost::optional<StateTransition::State> next_state = boost::none;
   };
 
-  typedef std::map<std::string, ImageState> ImageStates;
+  typedef std::map<std::string, ImageState> ImageStates; //NITHYA: global_id to ImageState?
 
   librados::IoCtx &m_ioctx;
 

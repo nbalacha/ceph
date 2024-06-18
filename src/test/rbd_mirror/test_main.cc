@@ -31,7 +31,7 @@ int main(int argc, char **argv)
   register_test_instances();
   register_test_leader_watcher();
   register_test_pool_watcher();
-  register_test_rbd_mirror();
+  register_test_rbd_mirror();  // In test_ImageReplayer.cc
   register_test_rbd_mirror_image_deleter();
 
   ::testing::InitGoogleTest(&argc, argv);

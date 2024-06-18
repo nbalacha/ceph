@@ -54,7 +54,7 @@ struct ImageId {
   inline bool operator==(const ImageId &rhs) const {
     return (global_id == rhs.global_id && id == rhs.id);
   }
-  inline bool operator<(const ImageId &rhs) const {
+  inline bool operator<(const ImageId &rhs) const { //NITHYA: Where is this comparison used? Ans: The set on line 64.
     return global_id < rhs.global_id;
   }
 };

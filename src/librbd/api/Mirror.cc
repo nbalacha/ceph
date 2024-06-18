@@ -1104,7 +1104,7 @@ int Mirror<I>::mode_set(librados::IoCtx& io_ctx,
       return r;
     } else if (!mirror_peers.empty()) {
       lderr(cct) << "mirror peers still registered" << dendl;
-      return -EBUSY;
+      return -EBUSY; //NITHYA : TODO: Return an error message to the end user.
     }
   }
 
@@ -1353,6 +1353,18 @@ int Mirror<I>::peer_bootstrap_create(librados::IoCtx& io_ctx,
 
   return 0;
 }
+
+/*
+  Uses the token info (remote fsid, client, mon_host, key)
+  to connect to the remote cluster. It 
+   - sets the mon_host and key in the remote cluster conf. (Is it saved?)
+   - verifies that the remote fsid is the same as the one in the token. 
+   - validates the site name. 
+   - verifies that the remote pool with the same name as the local pool is mirror enabled.
+   - If the local pool is not mirror enabled, it is enabled (same as the remote).
+      - creates a local cluster peer on the remote cluster.
+   - creates the remote cluster peer on the local cluster.
+*/
 
 template <typename I>
 int Mirror<I>::peer_bootstrap_import(librados::IoCtx& io_ctx,

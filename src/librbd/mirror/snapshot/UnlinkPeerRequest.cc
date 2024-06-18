@@ -101,7 +101,7 @@ void UnlinkPeerRequest<I>::unlink_peer() {
        (mirror_ns->mirror_peer_uuids.size() == 1 &&
         mirror_ns->mirror_peer_uuids.count(m_mirror_peer_uuid) != 0)) &&
       have_newer_mirror_snapshot) {
-    if (m_allow_remove) {
+    if (m_allow_remove) { // Used when it crosses max_snapshots
       m_image_ctx->image_lock.unlock_shared();
       remove_snapshot(snap_namespace, snap_name);
       return;
@@ -128,7 +128,8 @@ void UnlinkPeerRequest<I>::unlink_peer() {
   ldout(cct, 15) << "snap_id=" << m_snap_id << ", "
                  << "mirror_peer_uuid=" << m_mirror_peer_uuid << dendl;
   librados::ObjectWriteOperation op;
-  librbd::cls_client::mirror_image_snapshot_unlink_peer(&op, m_snap_id,
+  // THIS removes this peer uuid from the snap ns in the image header object
+  librbd::cls_client::mirror_image_snapshot_unlink_peer(&op, m_snap_id,  
                                                         m_mirror_peer_uuid);
   auto aio_comp = create_rados_callback<
     UnlinkPeerRequest<I>, &UnlinkPeerRequest<I>::handle_unlink_peer>(this);

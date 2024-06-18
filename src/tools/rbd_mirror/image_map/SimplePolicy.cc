@@ -73,7 +73,7 @@ std::string SimplePolicy::do_map(const InstanceToImageMap& map,
       continue;
     } else if (min_it == map.end()) {
       min_it = it;
-    } else if (it->second.size() < min_it->second.size()) {
+    } else if (it->second.size() < min_it->second.size()) { //Find the instance with the smallest number of mapped images
       min_it = it;
     }
   }

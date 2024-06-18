@@ -2047,7 +2047,7 @@ int mirror_image_list_finish(bufferlist::const_iterator *it,
 
 int mirror_image_list(librados::IoCtx *ioctx,
                       const std::string &start, uint64_t max_return,
-                      std::map<std::string, std::string> *mirror_image_ids) {
+                      std::map<std::string, std::string> *mirror_image_ids) { // NITHYA: local_id -> global_id
   librados::ObjectReadOperation op;
   mirror_image_list_start(&op, start, max_return);
 

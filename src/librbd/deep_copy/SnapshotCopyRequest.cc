@@ -97,7 +97,7 @@ void SnapshotCopyRequest<I>::send() {
     return;
   }
 
-  r = validate_parent(m_dst_image_ctx, &m_dst_parent_spec);
+  r = validate_parent(m_dst_image_ctx, &m_dst_parent_spec); // NITHYA : Figure out how tihs works
   if (r < 0) {
     lderr(m_cct) << "destination image parent spec mismatch" << dendl;
     error(r);
@@ -148,7 +148,7 @@ void SnapshotCopyRequest<I>::send_snap_unprotect() {
 
     // if destination snapshot is protected and (1) it isn't in our mapping
     // table, or (2) the source snapshot isn't protected, unprotect it
-    auto snap_seq_it = std::find_if(
+    auto snap_seq_it = std::find_if( //NITHYA : Isn't m_snap_seqs empty for a regular deep copy command. What about mirroring?
       m_snap_seqs.begin(), m_snap_seqs.end(),
       [dst_snap_id](const SnapSeqs::value_type& pair) {
         return pair.second == dst_snap_id;
@@ -277,7 +277,7 @@ void SnapshotCopyRequest<I>::send_snap_remove() {
         return pair.second == dst_snap_id;
       });
 
-    if (snap_seq_it == m_snap_seqs.end()) {
+    if (snap_seq_it == m_snap_seqs.end()) {  //NITHYA ? Why??
       break;
     }
   }

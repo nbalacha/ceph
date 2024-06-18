@@ -110,7 +110,7 @@ void ImageCopyRequest<I>::compute_diff() {
     ImageCopyRequest<I>, &ImageCopyRequest<I>::handle_compute_diff>(this);
   auto req = object_map::DiffRequest<I>::create(m_src_image_ctx,
                                                 m_src_snap_id_start,
-                                                m_src_snap_id_end, 0, UINT64_MAX,
+                                                m_src_snap_id_end, 0, UINT64_MAX, // Starting obj to end obj
                                                 &m_object_diff_state, ctx);
   req->send();
 }
@@ -198,7 +198,7 @@ void ImageCopyRequest<I>::send_next_object_copy() {
     return;
   }
 
-  uint64_t ono = m_object_no++;
+  uint64_t ono = m_object_no++; // Are we skipping an object ? Is the starting object number > 0?
   Context *ctx = new LambdaContext(
     [this, ono](int r) {
       handle_object_copy(ono, r);
@@ -217,11 +217,9 @@ void ImageCopyRequest<I>::send_next_object_copy() {
       if (src_ono >= m_object_diff_state.size()) {
         object_diff_state = object_map::DIFF_STATE_DATA_UPDATED;
       } else {
-        auto state = m_object_diff_state[src_ono];
-        if ((state == object_map::DIFF_STATE_HOLE_UPDATED &&
-             object_diff_state != object_map::DIFF_STATE_DATA_UPDATED) ||
-            (state == object_map::DIFF_STATE_DATA &&
-             object_diff_state == object_map::DIFF_STATE_HOLE) ||
+        auto state = m_object_diff_state[src_ono]; 
+        if ((state == object_map::DIFF_STATE_HOLE_UPDATED && object_diff_state != object_map::DIFF_STATE_DATA_UPDATED) ||
+            (state == object_map::DIFF_STATE_DATA && object_diff_state == object_map::DIFF_STATE_HOLE) || 
             (state == object_map::DIFF_STATE_DATA_UPDATED)) {
           object_diff_state = state;
         }
@@ -241,8 +239,9 @@ void ImageCopyRequest<I>::send_next_object_copy() {
   uint32_t flags = 0;
   if (m_flatten) {
     flags |= OBJECT_COPY_REQUEST_FLAG_FLATTEN;
-  }
+  } 
   if (object_diff_state == object_map::DIFF_STATE_DATA) {
+    // NITHYA : No change in data from the starting src snap.
     // no source objects have been updated and at least one has clean data
     flags |= OBJECT_COPY_REQUEST_FLAG_EXISTS_CLEAN;
   }

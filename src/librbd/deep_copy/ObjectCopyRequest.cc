@@ -54,7 +54,7 @@ ObjectCopyRequest<I>::ObjectCopyRequest(I *src_image_ctx,
   m_src_async_op = new io::AsyncOperation();
   m_src_async_op->start_op(*get_image_ctx(m_src_image_ctx));
 
-  m_src_io_ctx.dup(m_src_image_ctx->data_ctx);
+  m_src_io_ctx.dup(m_src_image_ctx->data_ctx); // NITHYA : The data pool might be different
   m_dst_io_ctx.dup(m_dst_image_ctx->data_ctx);
 
   m_dst_oid = m_dst_image_ctx->get_object_name(dst_object_number);
@@ -75,6 +75,7 @@ void ObjectCopyRequest<I>::send() {
 template <typename I>
 void ObjectCopyRequest<I>::send_list_snaps() {
   // image extents are consistent across src and dst so compute once
+  // convert the object extents to image extents
   std::tie(m_image_extents, m_image_area) = io::util::object_to_area_extents(
       m_dst_image_ctx, m_dst_object_number,
       {{0, m_dst_image_ctx->layout.object_size}});
@@ -92,7 +93,7 @@ void ObjectCopyRequest<I>::send_list_snaps() {
   }
 
   io::SnapIds snap_ids;
-  snap_ids.reserve(1 + m_snap_map.size());
+  snap_ids.reserve(1 + m_snap_map.size()); // NITHYA : Sets first element to 0 already? Mo!
   snap_ids.push_back(m_src_snap_id_start);
   for (auto& [src_snap_id, _] : m_snap_map) {
     if (m_src_snap_id_start < src_snap_id) {
@@ -102,10 +103,13 @@ void ObjectCopyRequest<I>::send_list_snaps() {
 
   ldout(m_cct, 3) << "NITHYA : snap_ids" << snap_ids << dendl;
 
+//NITHYA : What does disable list from parent do? It only returns the diff from the clone instead of getting the parent data as well.
   auto list_snaps_flags = io::LIST_SNAPS_FLAG_DISABLE_LIST_FROM_PARENT;
 
   m_snapshot_delta.clear();
 
+// Get the snap delta from the source image. List snapshots at the Image level as the src image layout
+// need not match the dst layout.
   auto aio_comp = io::AioCompletion::create_and_start(
     ctx, get_image_ctx(m_src_image_ctx), io::AIO_TYPE_GENERIC);
   auto req = io::ImageDispatchSpec::create_list_snaps(
@@ -127,7 +131,7 @@ void ObjectCopyRequest<I>::handle_list_snaps(int r) {
 
   ldout(m_cct, 20) << "snapshot_delta=" << m_snapshot_delta << dendl;
 
-  compute_dst_object_may_exist();
+  compute_dst_object_may_exist();  // Checks if the destination object could exist based on the size of the image at the snap.
   compute_read_ops();
 
   send_read();
@@ -483,11 +487,11 @@ void ObjectCopyRequest<I>::compute_read_ops() {
   ldout(m_cct, 20) << dendl;
 
   m_src_image_ctx->image_lock.lock_shared();
-  bool read_from_parent = (m_src_snap_id_start == 0 &&
+  bool read_from_parent = (m_src_snap_id_start == 0 && // NITHYA : why not if a snap_id_start is > 0 ?
                            m_src_image_ctx->parent != nullptr);
   m_src_image_ctx->image_lock.unlock_shared();
 
-  bool only_dne_extents = true;
+  bool only_dne_extents = true;  // Usually not hit without a --flatten as the ImageCopyRequest layer will filter out the objs
   interval_set<uint64_t> dne_image_interval;
 
   // compute read ops for any data sections or for any extents that we need to
@@ -553,7 +557,12 @@ void ObjectCopyRequest<I>::compute_read_ops() {
   }
 
   bool flatten = ((m_flags & OBJECT_COPY_REQUEST_FLAG_FLATTEN) != 0);
-  if (!dne_image_interval.empty() && (!only_dne_extents || flatten)) {
+  //NITHYA : // only_dne_extents can be false if src layout does not match dst layout.
+  // If the src obj size is 2MB and the dst obj size is 4 MB, 2 src objs map
+  // to a single dst obj. One of those might be DNE and the other might exist.
+  // The data for both will need to be copied to the dst obj.
+
+  if (!dne_image_interval.empty() && (!only_dne_extents || flatten)) { 
     auto snap_map_it = m_snap_map.begin();
     ceph_assert(snap_map_it != m_snap_map.end());
 
@@ -599,6 +608,8 @@ void ObjectCopyRequest<I>::merge_write_ops() {
     auto src_snap_seq = write_read_snap_ids.first;
 
     // convert the resulting sparse image extent map to an interval ...
+    // NITHYA : The read sends back the actual data size. So if the snap shows 3M changed but the first 1M was not written,
+    // The read will only return offset=1M length = 2M
     auto& image_data_interval = m_dst_data_interval[src_snap_seq];
     ldout(m_cct, 3) << "NITHYA : src_snap_seq" << src_snap_seq  << ", image_data_interval" << image_data_interval << dendl;
     for (auto [image_offset, image_length] : read_op.image_extent_map) {
@@ -652,7 +663,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
 
   m_src_image_ctx->image_lock.lock_shared();
   bool hide_parent = (m_src_snap_id_start == 0 &&
-                      m_src_image_ctx->parent != nullptr);
+                      m_src_image_ctx->parent != nullptr);  //NITHYA: Why not if m_src_snap_id_start > 0 ?
   m_src_image_ctx->image_lock.unlock_shared();
   bool update_map_object_nonexistent = false;
 
@@ -661,7 +672,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
   for (auto& [src_snap_seq, _] : m_snap_map) {
     ldout(m_cct, 3) << "NITHYA(1) : src_snap_seq=" << src_snap_seq  << dendl;
     if (m_src_snap_id_start < src_snap_seq) {
-      m_dst_zero_interval[src_snap_seq];
+      m_dst_zero_interval[src_snap_seq]; // Will be initialized to empty interval set if not already set
     }
   }
 
@@ -674,7 +685,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
   uint64_t prev_end_size = 0;
 
   // compute zero ops from the zeroed intervals
-  for (auto &it : m_dst_zero_interval) {
+  for (auto &it : m_dst_zero_interval) {  
     auto src_snap_seq = it.first;
     auto &zero_interval = it.second;
 
@@ -685,7 +696,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
     auto dst_may_exist_it = m_dst_object_may_exist.find(dst_snap_seq);
     ceph_assert(dst_may_exist_it != m_dst_object_may_exist.end());
     if (!dst_may_exist_it->second && object_exists) {
-      ldout(m_cct, 3) << "object DNE for snap_id: " << dst_snap_seq << dendl;
+      ldout(m_cct, 3) << "object DNE for snap_id: " << dst_snap_seq << dendl; // NITHYA : resized?
       m_snapshot_sparse_bufferlist[src_snap_seq].insert(
         0, m_dst_image_ctx->layout.object_size,
         {io::SPARSE_EXTENT_STATE_ZEROED, m_dst_image_ctx->layout.object_size});
@@ -772,7 +783,7 @@ void ObjectCopyRequest<I>::compute_zero_ops() {
       for (auto &sparse_bufferlist : iter->second) {
         object_exists = true;
         end_size = std::max(
-          end_size, sparse_bufferlist.get_off() + sparse_bufferlist.get_len());
+          end_size, sparse_bufferlist.get_off() + sparse_bufferlist.get_len()); // Cannot use src delta info because layouts may differ
       }
     }
 

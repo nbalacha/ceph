@@ -140,7 +140,7 @@ enum MirrorImageMode {
 enum MirrorImageState {
   MIRROR_IMAGE_STATE_DISABLING = 0,
   MIRROR_IMAGE_STATE_ENABLED   = 1,
-  MIRROR_IMAGE_STATE_DISABLED  = 2,
+  MIRROR_IMAGE_STATE_DISABLED  = 2,   // NITHYA : Used only when notifying the mirroring
   MIRROR_IMAGE_STATE_CREATING  = 3,
 };
 
@@ -409,7 +409,7 @@ struct GroupSpec {
     : group_id(group_id), pool_id(pool_id) {}
 
   std::string group_id;
-  int64_t pool_id = -1;
+  int64_t pool_id = -1; //NITHYA : No namespace?
 
   void encode(ceph::buffer::list &bl) const;
   void decode(ceph::buffer::list::const_iterator &it);

@@ -208,7 +208,7 @@ private:
 } // anonymous namespace
 
 template <typename I>
-struct PoolReplayer<I>::RemotePoolPollerListener
+struct PoolReplayer<I>::RemotePoolPollerListener //NITHYA: A struct defined inside the PoolReplayer class
   : public remote_pool_poller::Listener {
 
   PoolReplayer<I>* m_pool_replayer;
@@ -362,8 +362,10 @@ void PoolReplayer<I>::init(const std::string& site_name) {
     m_remote_pool_poller.reset();
     return;
   }
-  ceph_assert(!m_remote_pool_meta.mirror_uuid.empty());
-  m_pool_meta_cache->set_remote_pool_meta(
+  // NITHYA: m_remote_pool_poller->init() gets this information and calls notify_listener() 
+  // This is turn calls PoolReplayer::handle_remote_pool_meta_updated() so this is updated by now.
+  ceph_assert(!m_remote_pool_meta.mirror_uuid.empty()); 
+  m_pool_meta_cache->set_remote_pool_meta( 
     m_remote_io_ctx.get_id(), m_remote_pool_meta);
   m_pool_meta_cache->set_local_pool_meta(
     m_local_io_ctx.get_id(), {m_local_mirror_uuid});
@@ -386,6 +388,8 @@ void PoolReplayer<I>::init(const std::string& site_name) {
     m_default_namespace_replayer.reset();
     return;
   }
+
+//NITHYA: The leader is significant when there are multiple instances of the rbd-mirror daemon
 
   m_leader_watcher.reset(LeaderWatcher<I>::create(m_threads, m_local_io_ctx,
                                                   &m_leader_listener));
@@ -415,6 +419,7 @@ template <typename I>
 void PoolReplayer<I>::shut_down() {
   dout(20) << dendl;
   {
+
     std::lock_guard l{m_lock};
     m_stopping = true;
     m_cond.notify_all();
@@ -587,7 +592,7 @@ template <typename I>
 void PoolReplayer<I>::run() {
   dout(20) << dendl;
 
-  while (true) {
+  while (true) { // Updates the namespace replayers , asok hook every 30s (default)
     std::string asok_hook_name = m_local_io_ctx.get_pool_name() + " " +
                                  m_peer.cluster_name;
     if (m_asok_hook_name != asok_hook_name || m_asok_hook == nullptr) {
@@ -602,6 +607,7 @@ void PoolReplayer<I>::run() {
 
     std::unique_lock locker{m_lock};
 
+    // Stop if the leader_watcher or any namespace replayer is blocklisted. 
     if (m_leader_watcher->is_blocklisted() ||
         m_default_namespace_replayer->is_blocklisted()) {
       m_blocklisted = true;
@@ -649,26 +655,26 @@ void PoolReplayer<I>::update_namespace_replayers() {
   auto cct = reinterpret_cast<CephContext *>(m_local_io_ctx.cct());
   C_SaferCond cond;
   auto gather_ctx = new C_Gather(cct, &cond);
-  for (auto it = m_namespace_replayers.begin();
+  for (auto it = m_namespace_replayers.begin(); // remove replayers for any newly disabled namespaces.
        it != m_namespace_replayers.end(); ) {
-    auto iter = mirroring_namespaces.find(it->first);
-    if (iter == mirroring_namespaces.end()) {
+    auto iter = mirroring_namespaces.find(it->first); 
+    if (iter == mirroring_namespaces.end()) {// The namespace has been disabled. Shut down the replayer.
       auto namespace_replayer = it->second;
       auto on_shut_down = new LambdaContext(
         [namespace_replayer, ctx=gather_ctx->new_sub()](int r) {
           delete namespace_replayer;
           ctx->complete(r);
-        });
+        }); // NITHYA: When does this run?
       m_service_daemon->remove_namespace(m_local_pool_id, it->first);
       namespace_replayer->shut_down(on_shut_down);
       it = m_namespace_replayers.erase(it);
     } else {
-      mirroring_namespaces.erase(iter);
+      mirroring_namespaces.erase(iter); // Namespace replayer is already present. Nothing to do here.
       it++;
     }
   }
 
-  for (auto &name : mirroring_namespaces) {
+  for (auto &name : mirroring_namespaces) {  //Create replayers for newly enabled namespaces.
     auto namespace_replayer = NamespaceReplayer<I>::create(
         name, m_local_io_ctx, m_remote_io_ctx, m_local_mirror_uuid, m_peer.uuid,
         m_remote_pool_meta, m_threads, m_image_sync_throttler.get(),
@@ -702,7 +708,7 @@ void PoolReplayer<I>::update_namespace_replayers() {
     C_SaferCond acquire_cond;
     auto acquire_gather_ctx = new C_Gather(cct, &acquire_cond);
 
-    for (auto &name : mirroring_namespaces) {
+    for (auto &name : mirroring_namespaces) { // Newly added namespaces
       namespace_replayer_acquire_leader(name, acquire_gather_ctx->new_sub());
     }
     acquire_gather_ctx->activate();
@@ -748,7 +754,8 @@ int PoolReplayer<I>::list_mirroring_namespaces(
 
   for (auto &name : names) {
     cls::rbd::MirrorMode mirror_mode = cls::rbd::MIRROR_MODE_DISABLED;
-    int r = librbd::cls_client::mirror_mode_get(&m_local_io_ctx, &mirror_mode);
+    // NITHYA: should the io_ctx have the namespace set before calling this? io_ctx->set_namespace() ?
+    int r = librbd::cls_client::mirror_mode_get(&m_local_io_ctx, &mirror_mode); 
     if (r < 0 && r != -ENOENT) {
       derr << "failed to get namespace mirror mode: " << cpp_strerror(r)
            << dendl;
@@ -1108,11 +1115,13 @@ void PoolReplayer<I>::handle_remote_pool_meta_updated(
     const RemotePoolMeta& remote_pool_meta) {
   dout(5) << "remote_pool_meta=" << remote_pool_meta << dendl;
 
+// If the PoolReplayer is still initialising
   if (!m_default_namespace_replayer) {
     m_remote_pool_meta = remote_pool_meta;
     return;
   }
 
+// If the remote pool meta was modified after the PoolReplayer was initialised it needs to shutdown.
   derr << "remote pool metadata updated unexpectedly" << dendl;
   std::unique_lock locker{m_lock};
   m_stopping = true;

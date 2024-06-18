@@ -155,7 +155,7 @@ void ClusterWatcher::read_pool_peers(PoolPeers *pool_peers)
     std::vector<PeerSpec> peers;
     peers.reserve(configs.size());
     for (auto& peer : configs) {
-      if (peer.direction != RBD_MIRROR_PEER_DIRECTION_TX) {
+      if (peer.direction != RBD_MIRROR_PEER_DIRECTION_TX) { // NITHYA : This daemon is not only transmitting
         peers.push_back(peer);
       }
     }

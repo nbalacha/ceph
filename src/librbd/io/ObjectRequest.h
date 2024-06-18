@@ -140,6 +140,7 @@ private:
   int m_op_flags;
   int m_read_flags;
   uint64_t* m_version;
+  bool wait_for_copyup = true;
 
   void read_object();
   void handle_read_object(int r);

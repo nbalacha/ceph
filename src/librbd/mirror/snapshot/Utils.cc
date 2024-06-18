@@ -77,7 +77,7 @@ bool can_create_primary_snapshot(I *image_ctx, bool demoted, bool force,
     ldout(cct, 20) << "previous snapshot snap_id=" << it->first << " "
                    << *mirror_ns << dendl;
     if (mirror_ns->is_demoted() && !force) {
-      lderr(cct) << "trying to create primary snapshot without force "
+      lderr(cct) << "trying to create primary snapshot without force " //NITHYA: Why does this require force?
                  << "when previous primary snapshot is demoted"
                  << dendl;
       return false;
@@ -86,8 +86,8 @@ bool can_create_primary_snapshot(I *image_ctx, bool demoted, bool force,
     if (mirror_ns->state == cls::rbd::MIRROR_SNAPSHOT_STATE_NON_PRIMARY) {
       if (!force) {
         lderr(cct) << "trying to create primary snapshot without force "
-                   << "when previous snapshot is non-primary"
-                   << dendl;
+                   << "when previous snapshot is non-primary" //NITHYA: It should be MIRROR_SNAPSHOT_STATE_NON_PRIMARY_DEMOTED
+                   << dendl;     //  to allow the primary snap to be created.
         return false;
       }
       if (demoted) {
@@ -98,7 +98,7 @@ bool can_create_primary_snapshot(I *image_ctx, bool demoted, bool force,
       }
 
       if (requires_orphan != nullptr) {
-        *requires_orphan = !mirror_ns->is_demoted();
+        *requires_orphan = !mirror_ns->is_demoted(); // NITHYA; Like for a force promote?
       }
       if (!mirror_ns->complete) {
         ldout(cct, 20) << "needs rollback" << dendl;
