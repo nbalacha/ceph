@@ -267,7 +267,7 @@ private:
   std::string m_namespace_name;
   librados::IoCtx m_local_io_ctx;
   librados::IoCtx m_remote_io_ctx;
-  std::string m_local_mirror_uuid;
+  std::string m_local_mirror_uuid; // NITHYA : What is the difference between m_local_mirror_uuid and m_local_mirror_peer_uuid?
   std::string m_local_mirror_peer_uuid;
   RemotePoolMeta m_remote_pool_meta;
   Threads<ImageCtxT> *m_threads;

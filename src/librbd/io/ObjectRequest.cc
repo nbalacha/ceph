@@ -154,6 +154,8 @@ bool ObjectRequest<I>::compute_parent_extents(Extents *parent_extents,
   *area = ImageArea::DATA;
 
   uint64_t raw_overlap;
+  //NITHYA: This is an image (not object) level check for the image data 
+  // that overlaps with the child.
   int r = m_ictx->get_parent_overlap(
       m_io_context->get_read_snap(), &raw_overlap);
   if (r < 0) {
@@ -171,6 +173,7 @@ bool ObjectRequest<I>::compute_parent_extents(Extents *parent_extents,
     return false;
   }
 
+//NITHYA : convert object extents to image extents. parent_extents are Image extents.
   std::tie(*parent_extents, *area) = io::util::object_to_area_extents(
       m_ictx, m_object_no, {{0, m_ictx->layout.object_size}});
   uint64_t object_overlap = m_ictx->prune_parent_extents(
@@ -344,15 +347,39 @@ void ObjectReadRequest<I>::copyup() {
         this->m_trace);
 
     image_ctx->copyup_list[this->m_object_no] = new_req;
+    if (wait_for_copyup) {
+      new_req->append_read_request(this);
+    }
     image_ctx->copyup_list_lock.unlock();
     image_ctx->image_lock.unlock_shared();
     new_req->send();
   } else {
+    if (wait_for_copyup) {
+      it->second->append_read_request(this);
+    }
     image_ctx->copyup_list_lock.unlock();
     image_ctx->image_lock.unlock_shared();
   }
 
   image_ctx->owner_lock.unlock_shared();
+
+}
+
+
+template <typename I>
+void ObjectReadRequest<I>::handle_copyup(int r) {
+  I *image_ctx = this->m_ictx;
+  ldout(image_ctx->cct, 20) << "r=" << r << dendl;
+
+  ceph_assert(m_copyup_in_progress);
+  m_copyup_in_progress = false;
+
+  if (r < 0 && r != -ERESTART) {
+    lderr(image_ctx->cct) << "failed to copyup object: " << cpp_strerror(r)
+                          << dendl;
+    this->finish(r);
+    return;
+  }
   this->finish(0);
 }
 
@@ -748,7 +775,8 @@ ObjectListSnapsRequest<I>::ObjectListSnapsRequest(
     m_object_extents(std::move(object_extents)),
     m_snap_ids(std::move(snap_ids)), m_list_snaps_flags(list_snaps_flags),
     m_snapshot_delta(snapshot_delta) {
-  this->m_io_context->set_read_snap(CEPH_SNAPDIR);
+  this->m_io_context->set_read_snap(CEPH_SNAPDIR); 
+  //NITHYA include/rados.h:38:#define CEPH_SNAPDIR ((__u64)(-1))  /* reserved for hidden .snap dir */
 }
 
 template <typename I>
@@ -757,6 +785,7 @@ void ObjectListSnapsRequest<I>::send() {
   ldout(image_ctx->cct, 20) << dendl;
 
   if (m_snap_ids.size() < 2) {
+    // NITHYA : needs at least 2 snap_ids for a diff
     lderr(image_ctx->cct) << "invalid snap ids: " << m_snap_ids << dendl;
     this->async_finish(-EINVAL);
     return;
@@ -789,11 +818,13 @@ void ObjectListSnapsRequest<I>::handle_list_snaps(int r) {
   if (r >= 0) {
     r = -m_ec.value();
   }
-
+ 
   ldout(cct, 20) << "r=" << r << dendl;
 
   m_snapshot_delta->clear();
   auto& snapshot_delta = *m_snapshot_delta;
+  
+// NITHYA: Looks like rados returns the data for all the snaps on the object, not just those in m_snap_ids.
 
   ceph_assert(!m_snap_ids.empty());
   librados::snap_t start_snap_id = 0;
@@ -959,7 +990,7 @@ void ObjectListSnapsRequest<I>::list_from_parent() {
   librados::snap_t snap_id_end = *m_snap_ids.rbegin();
 
   std::unique_lock image_locker{image_ctx->image_lock};
-  if ((snap_id_start > 0) || (image_ctx->parent == nullptr) ||
+  if ((snap_id_start > 0) || (image_ctx->parent == nullptr) ||   // NITHYA : why check if (snap_id_start > 0)
       ((m_list_snaps_flags & LIST_SNAPS_FLAG_DISABLE_LIST_FROM_PARENT) != 0)) {
     image_locker.unlock();
 

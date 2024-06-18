@@ -36,7 +36,7 @@ DeepCopyRequest<I>::DeepCopyRequest(I *src_image_ctx, I *dst_image_ctx,
                                     SnapSeqs *snap_seqs,
                                     deep_copy::Handler *handler,
                                     Context *on_finish)
-  : RefCountedObject(dst_image_ctx->cct), m_src_image_ctx(src_image_ctx),
+  : RefCountedObject(dst_image_ctx->cct), m_src_image_ctx(src_image_ctx),  // NITHYA: Look into RefCountedObject
     m_dst_image_ctx(dst_image_ctx), m_src_snap_id_start(src_snap_id_start),
     m_src_snap_id_end(src_snap_id_end), m_dst_snap_id_start(dst_snap_id_start),
     m_flatten(flatten), m_object_number(object_number),
@@ -65,7 +65,9 @@ void DeepCopyRequest<I>::send() {
     return;
   }
 
-// NITHYA: Check if non-zero src and dst snapids are present in imagectx->snap_info
+// NITHYA: Check if non-zero src start and end snapids are present in src imagectx->snap_info
+// Basically, check if the src start and end snap_ids exist and belong to the src image
+
   int r = validate_copy_points();
   if (r < 0) {
     finish(r);
@@ -206,7 +208,7 @@ void DeepCopyRequest<I>::send_copy_object_map() {
     send_copy_metadata();
     return;
   }
-  if (m_src_snap_id_end == CEPH_NOSNAP) {
+  if (m_src_snap_id_end == CEPH_NOSNAP) {   // NITHYA : Why does this matter?
     m_dst_image_ctx->image_lock.unlock_shared();
     m_dst_image_ctx->owner_lock.unlock_shared();
     send_refresh_object_map();
@@ -304,6 +306,8 @@ void DeepCopyRequest<I>::handle_refresh_object_map(int r) {
   send_copy_metadata();
 }
 
+// NITHYA: This will copy the metadata key/vals from the src image header to the dst header.
+// RBD metadata keys begin with "metadata_"
 template <typename I>
 void DeepCopyRequest<I>::send_copy_metadata() {
   ldout(m_cct, 20) << dendl;

@@ -194,7 +194,7 @@ int group_image_remove(librados::IoCtx& group_ioctx, string group_id,
     lderr(cct) << "couldn't remove image from group"
 	       << cpp_strerror(-r) << dendl;
     return r;
-  }
+  } // NITHYA: This should notify the mirrorwatcher when groups are mirror enabled 
 
   return 0;
 }

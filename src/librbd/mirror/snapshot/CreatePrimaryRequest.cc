@@ -92,7 +92,7 @@ void CreatePrimaryRequest<I>::handle_get_mirror_peers(int r) {
   }
 
   for (auto &peer : peers) {
-    // NITHYA: Does this mean the peer is receiving or transmitting?
+    // NITHYA: We are not interested in a receive only peer as this will be the primary.
     if (peer.mirror_peer_direction == cls::rbd::MIRROR_PEER_DIRECTION_RX) {
       continue;
     }
@@ -111,7 +111,7 @@ void CreatePrimaryRequest<I>::handle_get_mirror_peers(int r) {
 
 template <typename I>
 void CreatePrimaryRequest<I>::create_snapshot() {
-  cls::rbd::MirrorSnapshotNamespace ns{
+  cls::rbd::MirrorSnapshotNamespace ns{  //NITHYA : Does not set complete to true?
     ((m_flags & CREATE_PRIMARY_FLAG_DEMOTED) != 0 ?
       cls::rbd::MIRROR_SNAPSHOT_STATE_PRIMARY_DEMOTED :
       cls::rbd::MIRROR_SNAPSHOT_STATE_PRIMARY),
@@ -177,7 +177,7 @@ void CreatePrimaryRequest<I>::handle_refresh_image(int r) {
 }
 
 template <typename I>
-void CreatePrimaryRequest<I>::unlink_peer() {
+void CreatePrimaryRequest<I>::unlink_peer() {  // To clean up older snaps
   // TODO: Document semantics for unlink_peer
   uint64_t max_snapshots = m_image_ctx->config.template get_val<uint64_t>(
     "rbd_mirroring_max_mirroring_snapshots");

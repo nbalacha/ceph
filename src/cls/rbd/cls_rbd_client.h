@@ -389,6 +389,8 @@ int mirror_mode_get(librados::IoCtx *ioctx,
 int mirror_mode_set(librados::IoCtx *ioctx,
                     cls::rbd::MirrorMode mirror_mode);
 
+int mirror_namespace_set(librados::IoCtx *ioctx,
+                         const std::string &namespace);
 int mirror_peer_ping(librados::IoCtx *ioctx,
                      const std::string& site_name,
                      const std::string& fsid);
@@ -499,7 +501,7 @@ void mirror_image_instance_list_start(librados::ObjectReadOperation *op,
                                       const std::string &start,
                                       uint64_t max_return);
 int mirror_image_instance_list_finish(ceph::buffer::list::const_iterator *iter,
-                                      std::map<std::string, entity_inst_t> *instances);
+                                      std::map<std::string, entity_inst_t> *instances); // NITHYA: I don't understand this.
 
 void mirror_instances_list_start(librados::ObjectReadOperation *op);
 int mirror_instances_list_finish(ceph::buffer::list::const_iterator *iter,

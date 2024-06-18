@@ -622,7 +622,7 @@ flush()
     local cluster=$1
     local pool=$2
     local image=$3
-    local cmd="rbd mirror flush"
+    local cmd="rbd mirror flush" // NITHYA : What does this do? Possily journal related?
 
     if [ -n "${image}" ]
     then

@@ -34,7 +34,7 @@ namespace mirror {
 template <typename> class RemotePoolPoller;
 namespace remote_pool_poller { struct Listener; }
 
-struct PoolMetaCache;
+struct PoolMetaCache; // NITHYA : Should this be class PoolMetaCache?
 template <typename> class ServiceDaemon;
 template <typename> struct Threads;
 
@@ -125,7 +125,7 @@ private:
   void with_namespace_replayers(L &&callback) {
     std::lock_guard locker{m_lock};
 
-    if (m_namespace_replayers_locked) {
+    if (m_namespace_replayers_locked) { // If already locked, a callback may be in progress.
       ceph_assert(m_on_namespace_replayers_unlocked == nullptr);
       C_SaferCond cond;
       m_on_namespace_replayers_unlocked = &cond;

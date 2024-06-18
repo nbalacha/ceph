@@ -15,6 +15,44 @@ using namespace std;
 /**
  * calculate intervals/extents that vary between two snapshots
  */
+
+/*
+NITHYA: example of a snap_set
+
+xfs_io -d -c 'pwrite -S 0x2222 -b 4M 0M 4M' /dev/nbd0
+bin/rbd --cluster site-a snap create data/test2@snap1
+xfs_io -d -c 'pwrite -S 0x3333 -b 4M 2M 4M' /dev/nbd0
+bin/rbd --cluster site-a snap create data/test2@snap
+
+(gdb) p snap_set
+$36 = (const librados::snap_set_t &) @0x7fffee2fa900: 
+{clones = std::vector of length 2, capacity 2 = {{cloneid = 10, snaps = std::vector of length 1, capacity 1 = {10}, 
+overlap = std::vector of length 1, capacity 1 = {{first = 0, second = 2097152}}, size = 4194304}, 
+{cloneid = 18446744073709551614, snaps = std::vector of length 0, capacity 0, overlap = std::vector of length 0, capacity 0, 
+size = 4194304}}, seq = 10}
+
+xfs_io -d -c 'pwrite -S 0x4444 -b 4M 3M 4M' /dev/nbd0
+
+$44 = (const librados::snap_set_t &) @0x7fffedaf9900: 
+{clones = std::vector of length 3, capacity 3 = {{cloneid = 10, snaps = std::vector of length 1, capacity 1 = {10}, 
+overlap = std::vector of length 1, capacity 1 = {{first = 0, second = 2097152}}, size = 4194304}, {cloneid = 11, 
+snaps = std::vector of length 1, capacity 1 = {11}, overlap = std::vector of length 1, capacity 1 = {{first = 0, second = 3145728}},
+ size = 4194304}, {cloneid = 18446744073709551614, snaps = std::vector of length 0, capacity 0, 
+ overlap = std::vector of length 0, capacity 0, size = 4194304}}, seq = 11}
+
+blkdiscard -o 3M -l 1M /dev/nbd0
+bin/rbd --cluster site-a snap create data/test2@snap2
+
+(gdb) p snap_set
+$45 = (const librados::snap_set_t &) @0x7fffedaf9900: {clones = std::vector of length 3, 
+capacity 3 = {{cloneid = 10, snaps = std::vector of length 1, capacity 1 = {10}, overlap = std::vector of length 1, 
+capacity 1 = {{first = 0, second = 2097152}}, size = 4194304}, {cloneid = 11, snaps = std::vector of length 1, 
+capacity 1 = {11}, overlap = std::vector of length 1, capacity 1 = {{first = 0, second = 3145728}}, size = 4194304}, 
+{cloneid = 18446744073709551614, snaps = std::vector of length 0, capacity 0, overlap = std::vector of length 0, 
+capacity 0, size = 3145728}}, seq = 11}
+
+
+*/
 void calc_snap_set_diff(CephContext *cct, const librados::snap_set_t& snap_set,
 			librados::snap_t start, librados::snap_t end,
 			interval_set<uint64_t> *diff, uint64_t *end_size,
@@ -63,14 +101,14 @@ void calc_snap_set_diff(CephContext *cct, const librados::snap_set_t& snap_set,
 
     if (!saw_start) {
       if (start < a) {
-	ldout(cct, 20) << "  start, after " << start << dendl;
-	// this means the object didn't exist at start
-	if (r->size)
-	  diff->insert(0, r->size);
-	start_size = 0;
+	      ldout(cct, 20) << "  start, after " << start << dendl;
+	      // this means the object didn't exist at start
+	      if (r->size)
+	        diff->insert(0, r->size);
+	      start_size = 0;
       } else {
-	ldout(cct, 20) << "  start" << dendl;
-	start_size = r->size;
+	      ldout(cct, 20) << "  start" << dendl;
+	      start_size = r->size;
       }
       saw_start = true;
     }
@@ -99,7 +137,7 @@ void calc_snap_set_diff(CephContext *cct, const librados::snap_set_t& snap_set,
       } else if (prev_size <= start_size) {
         // truncated range below size at start
         diff_boundary = prev_size;
-      } else {
+      } else { //(r->size < prev_size) && (prev_size > start_size) so r->size could be > start_size
         // truncated range (partially) above size at start -- drop that
         // part from the running diff
         diff_boundary = std::max(r->size, start_size);

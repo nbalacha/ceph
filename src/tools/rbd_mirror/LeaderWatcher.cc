@@ -120,7 +120,7 @@ void LeaderWatcher<I>::register_watch() {
     m_work_queue, create_context_callback<
       LeaderWatcher<I>, &LeaderWatcher<I>::handle_register_watch>(this));
 
-  librbd::Watcher::register_watch(ctx);
+  librbd::Watcher::register_watch(ctx); //NITHYA: registers watch on RBD_MIRROR_LEADER
 }
 
 template <typename I>

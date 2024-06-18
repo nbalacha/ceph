@@ -345,7 +345,7 @@ void NamespaceReplayer<I>::init_instance_replayer() {
   ceph_assert(!m_instance_replayer);
 
   m_instance_replayer.reset(InstanceReplayer<I>::create(
-      m_local_io_ctx, m_local_mirror_uuid, m_threads, m_service_daemon,
+      m_local_io_ctx, m_local_mirror_uuid, m_threads, m_service_daemon, // NITHYA: Does not have remote_io_ctx
       m_local_status_updater.get(), m_cache_manager_handler,
       m_pool_meta_cache));
   auto ctx = create_context_callback<NamespaceReplayer<I>,

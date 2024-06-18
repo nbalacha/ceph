@@ -356,7 +356,7 @@ int CreateImageRequest<I>::validate_parent() {
 
   // scan all remote snapshots for a linked parent
   for (auto &snap_info_pair : m_remote_image_ctx->snap_info) {
-    auto &parent_spec = snap_info_pair.second.parent.spec;
+    auto &parent_spec = snap_info_pair.second.parent.spec;  // NITHYA: Why does the snapshot contain the parent spec?
     if (parent_spec.pool_id == -1) {
       continue;
     } else if (m_remote_parent_spec.pool_id == -1) {

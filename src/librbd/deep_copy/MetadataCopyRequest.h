@@ -47,7 +47,7 @@ private:
    *
    * @endverbatim
    */
-  typedef std::map<std::string, bufferlist> Metadata;
+  typedef std::map<std::string, bufferlist> Metadata; // NITHYA : Not used
 
   ImageCtxT *m_src_image_ctx;
   ImageCtxT *m_dst_image_ctx;

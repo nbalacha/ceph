@@ -112,7 +112,7 @@ struct InstanceWatcher<I>::C_NotifyInstanceRequest : public Context {
       notifier.reset(new librbd::watcher::Notifier(
                          instance_watcher->m_work_queue,
                          instance_watcher->m_ioctx,
-                         RBD_MIRROR_INSTANCE_PREFIX + instance_id));
+                         RBD_MIRROR_INSTANCE_PREFIX + instance_id)); // NITHYA: Notifies watchers on the instance rados obj.
     }
 
     instance_watcher->m_notify_op_tracker.start_op();
@@ -514,8 +514,8 @@ void InstanceWatcher<I>::notify_sync_start(const std::string &instance_id,
 
   uint64_t request_id = ++m_request_seq;
 
-  bufferlist bl;
-  encode(NotifyMessage{SyncStartPayload{request_id, sync_id}}, bl);
+  bufferlist bl;SyncStartPayload
+  encode(NotifyMessage{{request_id, sync_id}}, bl);
 
   auto ctx = new LambdaContext(
     [this, sync_id] (int r) {
@@ -728,6 +728,7 @@ void InstanceWatcher<I>::handle_register_watch(int r) {
 
   std::lock_guard locker{m_lock};
 
+//NITHYA: Why is it registering the watch for this object? It is the rbd_mirror_leader obj that is updated.
   if (r < 0) {
     derr << "error registering instance watcher for " << m_oid << " object: "
          << cpp_strerror(r) << dendl;

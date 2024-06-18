@@ -99,7 +99,7 @@ librados::IoCtx duplicate_io_ctx(librados::IoCtx& io_ctx) {
       name(image_name),
       asio_engine(std::make_shared<AsioEngine>(p)),
       rados_api(asio_engine->get_rados_api()),
-      data_ctx(duplicate_io_ctx(p)),
+      data_ctx(duplicate_io_ctx(p)),  // NITHYA How about for EC pools?
       md_ctx(duplicate_io_ctx(p)),
       image_watcher(NULL),
       journal(NULL),

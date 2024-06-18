@@ -36,7 +36,7 @@ void TestFixture::SetUpTestCase() {
   ASSERT_EQ(0, _rados->ioctx_create(_local_pool_name.c_str(), local_ioctx));
   local_ioctx.application_enable("rbd", true);
 
-  _remote_pool_name = get_temp_pool_name("test-rbd-mirror-");
+  _remote_pool_name = get_temp_pool_name("test-rbd-mirror-"); // Shouldn't it be the same as the local pool name?
   ASSERT_EQ(0, _rados->pool_create(_remote_pool_name.c_str()));
 
   librados::IoCtx remote_ioctx;
@@ -65,7 +65,7 @@ void TestFixture::SetUp() {
     seeded = true;
     int seed = getpid();
     std::cout << "seed " << seed << std::endl;
-    srand(seed);
+    srand(seed); // Use this to reproduce the exact test case.
   }
 
   ASSERT_EQ(0, _rados->ioctx_create(_local_pool_name.c_str(), m_local_io_ctx));
@@ -88,7 +88,7 @@ void TestFixture::TearDown() {
 
 int TestFixture::create_image(librbd::RBD &rbd, librados::IoCtx &ioctx,
                               const std::string &name, uint64_t size) {
-  int order = 18;
+  int order = 18;  //NITHYA : Why is the order != 22? To use less space?
   return rbd.create2(ioctx, name.c_str(), size, RBD_FEATURES_ALL, &order);
 }
 

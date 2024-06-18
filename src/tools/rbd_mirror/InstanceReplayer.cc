@@ -214,6 +214,8 @@ void InstanceReplayer<I>::remove_peer_image(const std::string &global_image_id,
   dout(10) << "global_image_id=" << global_image_id << ", "
            << "peer_mirror_uuid=" << peer_mirror_uuid << dendl;
 
+  // NITHYA: peer_mirror_uuid is not used in this function
+
   std::lock_guard locker{m_lock};
   ceph_assert(m_on_shut_down == nullptr);
 
@@ -536,7 +538,7 @@ void InstanceReplayer<I>::schedule_image_state_check_task() {
   int after = cct->_conf.get_val<uint64_t>(
     "rbd_mirror_image_state_check_interval");
 
-  dout(10) << "scheduling image state check after " << after << " sec (task "
+  dout(10) << "scheduling image state check after " << after << " sec (task " //NITHYA :30s
            << m_image_state_check_task << ")" << dendl;
   m_threads->timer->add_event_after(after, m_image_state_check_task);
 }

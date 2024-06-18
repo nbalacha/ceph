@@ -54,11 +54,11 @@ void Policy::init(
   std::unique_lock map_lock{m_map_lock};
   for (auto& it : image_mapping) {
     ceph_assert(!it.second.instance_id.empty());
-    auto map_result = m_map[it.second.instance_id].emplace(it.first);
+    auto map_result = m_map[it.second.instance_id].emplace(it.first); // Creates a map of instance_id->set{global_image_ids}
     ceph_assert(map_result.second);
 
-    auto image_state_result = m_image_states.emplace(
-      it.first, ImageState{it.second.instance_id, it.second.mapped_time});
+    auto image_state_result = m_image_states.emplace( // // Creates a map of global_id-> Instance_id+map_time
+      it.first, ImageState{it.second.instance_id, it.second.mapped_time});  // state will be STATE_UNASSOCIATED
     ceph_assert(image_state_result.second);
 
     // ensure we (re)send image acquire actions to the instance
