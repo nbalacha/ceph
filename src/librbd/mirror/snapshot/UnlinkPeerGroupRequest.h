@@ -1,8 +1,8 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
 // vim: ts=8 sw=2 smarttab
 
-#ifndef CEPH_LIBRBD_UNLINK_PEER_GROUP_REQUST_H
-#define CEPH_LIBRBD_UNLINK_PEER_GROUP_REQUST_H
+#ifndef CEPH_LIBRBD_MIRROR_SNAPSHOT_UNLINK_PEER_GROUP_REQUEST_H
+#define CEPH_LIBRBD_MIRROR_SNAPSHOT_UNLINK_PEER_GROUP_REQUEST_H
 
 #include "include/int_types.h"
 #include "include/types.h"
@@ -18,7 +18,8 @@ namespace librbd {
 
 struct ImageCtx;
 
-namespace group {
+namespace mirror {
+namespace snapshot {
 
 template <typename ImageCtxT = librbd::ImageCtx>
 class UnlinkPeerGroupRequest {
@@ -47,15 +48,21 @@ private:
   std::vector<ImageCtx *> *m_image_ctxs;
   Context *m_on_finish;
 
+  std::string m_group_snap_id; // Hack!
+
   void unlink_peer();
+
   void remove_group_snapshot(cls::rbd::GroupSnapshot group_snap);
+  void handle_remove_group_snapshot(int r);
+
   void remove_image_snapshot(ImageCtx *image_ctx, uint64_t snap_id);
   void finish(int r);
 };
 
-} // namespace group
+} // namespace snapshot
+} // namespace mirror
 } // namespace librbd
 
-extern template class librbd::group::UnlinkPeerGroupRequest<librbd::ImageCtx>;
+extern template class librbd::mirror::snapshot::UnlinkPeerGroupRequest<librbd::ImageCtx>;
 
-#endif // CEPH_LIBRBD_UNLINK_PEER_GROUP_REQUST_H
+#endif // CEPH_LIBRBD_MIRROR_SNAPSHOT_UNLINK_PEER_GROUP_REQUEST_H
