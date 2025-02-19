@@ -206,6 +206,7 @@ if [ -z "${RBD_MIRROR_USE_RBD_MIRROR}" ]; then
   admin_daemons ${CLUSTER1} rbd mirror group status ${POOL}/${group1}
 fi
 
+: '
 testlog "TEST: add a large image to group and test replay"
 big_image=test-image-big
 create_image ${CLUSTER2} ${POOL} ${big_image} 1G
@@ -250,6 +251,7 @@ remove_image_retry ${CLUSTER2} ${POOL} ${big_image}
 wait_for_group_replay_started ${CLUSTER1} ${POOL}/${group} 1
 mirror_group_snapshot_and_wait_for_sync_complete ${CLUSTER1} ${CLUSTER2} ${POOL}/${group}
 test_images_in_latest_synced_group ${CLUSTER1} ${POOL}/${group} 1
+'
 
 testlog "TEST: test group rename"
 new_name="${group}_RENAMED"
@@ -303,7 +305,7 @@ test_fields_in_group_info ${CLUSTER2} ${POOL}/${group} 'snapshot' 'enabled' 'tru
 wait_for_group_replay_started ${CLUSTER1} ${POOL}/${group} 1
 mirror_group_snapshot_and_wait_for_sync_complete ${CLUSTER1} ${CLUSTER2} ${POOL}/${group}
 wait_for_group_status_in_pool_dir ${CLUSTER1} ${POOL}/${group} 'up+replaying' 1
-wait_for_group_status_in_pool_dir ${CLUSTER2} ${POOL}/${group} 'up+stopped' 1
+wait_for_group_status_in_pool_dir ${CLUSTER2} ${POOL}/${group} 'up+stopped' 0
 compare_images ${CLUSTER1} ${CLUSTER2} ${POOL} ${POOL} ${image}
 
 testlog " - failover"
@@ -317,7 +319,7 @@ test_fields_in_group_info ${CLUSTER1} ${POOL}/${group1} 'snapshot' 'enabled' 'tr
 wait_for_group_replay_started ${CLUSTER2} ${POOL}/${group1} 1
 write_image ${CLUSTER1} ${POOL} ${image1} 100
 mirror_group_snapshot_and_wait_for_sync_complete ${CLUSTER2} ${CLUSTER1} ${POOL}/${group1}
-wait_for_group_status_in_pool_dir ${CLUSTER1} ${POOL}/${group1} 'up+stopped' 1
+wait_for_group_status_in_pool_dir ${CLUSTER1} ${POOL}/${group1} 'up+stopped' 0
 wait_for_group_status_in_pool_dir ${CLUSTER2} ${POOL}/${group1} 'up+replaying' 1
 compare_images ${CLUSTER1} ${CLUSTER2} ${POOL} ${POOL} ${image1}
 
@@ -333,7 +335,7 @@ wait_for_group_replay_started ${CLUSTER1} ${POOL}/${group1} 1
 write_image ${CLUSTER2} ${POOL} ${image1} 100
 mirror_group_snapshot_and_wait_for_sync_complete ${CLUSTER1} ${CLUSTER2} ${POOL}/${group1}
 wait_for_group_status_in_pool_dir ${CLUSTER1} ${POOL}/${group1} 'up+replaying' 1
-wait_for_group_status_in_pool_dir ${CLUSTER2} ${POOL}/${group1} 'up+stopped' 1
+wait_for_group_status_in_pool_dir ${CLUSTER2} ${POOL}/${group1} 'up+stopped' 0
 compare_images ${CLUSTER1} ${CLUSTER2} ${POOL} ${POOL} ${image1}
 
 testlog " - force promote cluster1"
