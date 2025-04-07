@@ -8680,6 +8680,7 @@ int group_snap_set(cls_method_context_t hctx,
   int r = group::check_duplicate_snap_name(hctx, group_snap.name,
                                            group_snap.id);
   if (r < 0) {
+    CLS_ERR("group check duplicate name : %d", r);
     return r;
   }
 
@@ -8725,6 +8726,7 @@ int group_snap_set(cls_method_context_t hctx,
               cpp_strerror(r).c_str());
       return r;
     }
+      CLS_ERR("NITHYA (2)- setting key: %s ", order_key.c_str());
   }
 
   bufferlist obl;
@@ -8734,6 +8736,7 @@ int group_snap_set(cls_method_context_t hctx,
     CLS_ERR("error setting key: %s : %s", key.c_str(), cpp_strerror(r).c_str());
     return r;
   }
+      CLS_ERR("NITHYA (3)- setting key: %s ", key.c_str());
   return 0;
 }
 
@@ -8761,6 +8764,7 @@ int group_snap_remove(cls_method_context_t hctx,
   std::string snap_key = group::snap_key(snap_id);
 
   CLS_LOG(20, "removing snapshot with key %s", snap_key.c_str());
+  CLS_ERR("removing snapshot with key %s", snap_key.c_str());
   int r = cls_cxx_map_remove_key(hctx, snap_key);
   if (r < 0) {
     CLS_ERR("error removing snapshot with key %s : %s", snap_key.c_str(),

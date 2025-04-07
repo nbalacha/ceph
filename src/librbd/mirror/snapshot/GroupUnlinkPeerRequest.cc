@@ -170,6 +170,7 @@ void GroupUnlinkPeerRequest<I>::remove_peer_uuid(
                               std::string mirror_peer_uuid) {
   ldout(m_cct, 10) << dendl;
 
+    lderr(m_cct) << "calling remove_peer_uuid" << dendl;
   auto aio_comp = create_rados_callback<
     GroupUnlinkPeerRequest<I>,
     &GroupUnlinkPeerRequest<I>::handle_remove_peer_uuid>(this);
@@ -177,6 +178,8 @@ void GroupUnlinkPeerRequest<I>::remove_peer_uuid(
   auto ns = std::get_if<cls::rbd::GroupSnapshotNamespaceMirror>(
     &group_snap.snapshot_namespace);
   ns->mirror_peer_uuids.erase(mirror_peer_uuid);
+
+  m_group_snap_id = group_snap.id;
 
   librados::ObjectWriteOperation op;
   librbd::cls_client::group_snap_set(&op, group_snap);
@@ -205,6 +208,7 @@ void GroupUnlinkPeerRequest<I>::remove_group_snapshot(
                               cls::rbd::GroupSnapshot group_snap) {
   ldout(m_cct, 10) << "group snap id: " << group_snap.id << dendl;
 
+    lderr(m_cct) << "group snap id " << m_group_id << dendl;
   //TODO: Handle dynamic group membership
   if (!m_image_ctxs->empty() && m_image_ctx_map.empty()) {
     for (size_t i = 0; i < m_image_ctxs->size(); ++i) {
@@ -284,6 +288,7 @@ void GroupUnlinkPeerRequest<I>::handle_remove_snap_metadata(int r) {
     finish(r);
     return;
   }
+    lderr(m_cct) << "removed snap metadata " << m_group_id << dendl;
   list_group_snaps();
 }
 
