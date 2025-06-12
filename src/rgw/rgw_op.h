@@ -482,7 +482,12 @@ public:
   virtual int send_response_data(bufferlist& bl, off_t ofs, off_t len) = 0;
 
   const char* name() const override { return "get_obj"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT", s->info.method); }
+  std::string canonical_name() const override {
+    if (get_torrent) {
+      return fmt::format("REST.{}.TORRENT", s->info.method);
+    }
+    return fmt::format("REST.{}.OBJECT", s->info.method);
+  }
   RGWOpType get_type() override { return RGW_OP_GET_OBJ; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
   virtual bool need_object_expiration() { return false; }
@@ -943,7 +948,6 @@ public:
   virtual bool should_get_stats() { return false; }
 
   const char* name() const override { return "get_self_usage"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.USER_USAGE", s->info.method); }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
 
@@ -960,7 +964,6 @@ public:
 
   void send_response() override = 0;
   const char* name() const override { return "stat_account"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.ACCOUNT_STATUS", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_STAT_ACCOUNT; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
@@ -1014,6 +1017,7 @@ public:
 
   void send_response() override = 0;
   const char* name() const override { return "get_bucket_location"; }
+  std::string canonical_name() const override { return fmt::format("REST.{}.LOCATION", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_GET_BUCKET_LOCATION; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
@@ -1129,7 +1133,6 @@ public:
   virtual int get_params(optional_yield y) = 0;
   void send_response() override = 0;
   const char* name() const override { return "stat_bucket"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.BUCKET_STATUS", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_STAT_BUCKET; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
@@ -1440,7 +1443,6 @@ public:
                                    const std::set<std::string>& rmattr_names,
                                    std::map<int, std::string>& temp_url_keys);
   const char* name() const override { return "put_account_metadata"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.ACCOUNT_METADATA", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_PUT_METADATA_ACCOUNT; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
@@ -1472,7 +1474,6 @@ public:
   virtual int get_params(optional_yield y) = 0;
   void send_response() override = 0;
   const char* name() const override { return "put_bucket_metadata"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.BUCKET_METADATA", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_PUT_METADATA_BUCKET; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
@@ -1495,7 +1496,6 @@ public:
   virtual int get_params(optional_yield y) = 0;
   void send_response() override = 0;
   const char* name() const override { return "put_obj_metadata"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT_METADATA", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_PUT_METADATA_OBJECT; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
   virtual bool need_object_expiration() { return false; }
@@ -1516,7 +1516,7 @@ public:
 
   void send_response() override = 0;
   const char* name() const override { return "restore_obj"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT", s->info.method); }
+  std::string canonical_name() const override { return fmt::format("REST.{}.RESTORE", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_RESTORE_OBJ; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
@@ -1738,6 +1738,7 @@ public:
   void execute(optional_yield y) override;
   void send_response() override = 0;
   const char* name() const override { return "get_obj_attrs"; }
+  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT_ATTRIBUTES", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_GET_OBJ_ATTRS; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 }; /* RGWGetObjAttrs */
@@ -2578,6 +2579,7 @@ public:
   virtual void send_response() override = 0;
   virtual int get_params(optional_yield y) = 0;
   const char* name() const override { return "put_bucket_object_lock"; }
+  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT_LOCK", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_PUT_BUCKET_OBJ_LOCK; }
   uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
@@ -2589,6 +2591,7 @@ public:
   void execute(optional_yield y) override;
   virtual void send_response() override = 0;
   const char* name() const override {return "get_bucket_object_lock"; }
+  std::string canonical_name() const override { return fmt::format("REST.{}.OBJECT_LOCK", s->info.method); }
   RGWOpType get_type() override { return RGW_OP_GET_BUCKET_OBJ_LOCK; }
   uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
@@ -2669,7 +2672,6 @@ public:
 
   virtual int get_params(optional_yield y) = 0;
   const char* name() const override { return "config_bucket_meta_search"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.BUCKET_MDSEARCH", s->info.method); }
   virtual RGWOpType get_type() override { return RGW_OP_CONFIG_BUCKET_META_SEARCH; }
   virtual uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
@@ -2683,7 +2685,6 @@ public:
   void execute(optional_yield) override {}
 
   const char* name() const override { return "get_bucket_meta_search"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.BUCKET_MDSEARCH", s->info.method); }
   virtual RGWOpType get_type() override { return RGW_OP_GET_BUCKET_META_SEARCH; }
   virtual uint32_t op_mask() override { return RGW_OP_TYPE_READ; }
 };
@@ -2697,7 +2698,6 @@ public:
   void execute(optional_yield y) override;
 
   const char* name() const override { return "delete_bucket_meta_search"; }
-  std::string canonical_name() const override { return fmt::format("REST.{}.BUCKET_MDSEARCH", s->info.method); }
   virtual RGWOpType delete_type() { return RGW_OP_DEL_BUCKET_META_SEARCH; }
   virtual uint32_t op_mask() override { return RGW_OP_TYPE_WRITE; }
 };
