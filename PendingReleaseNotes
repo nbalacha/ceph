@@ -1,3 +1,17 @@
+* RGW: Bucket Logging suppports creating log buckets in EC pools.
+  Implicit logging object commits are now performed asynchronously.
+* RGW: OpenSSL engine support is deprecated in favor of provider support.
+  - Removed the `openssl_engine_opts` configuration option. OpenSSL engine configuration in string format is no longer supported.
+  - Added the `openssl_conf` configuration option for loading specified providers as default providers.
+    Configuration file syntax follows the OpenSSL standard (see https://github.com/openssl/openssl/blob/master/doc/man5/config.pod).
+    If the default provider is required when also using custom providers,
+    it must be explicitly loaded in the configuration file or code (see https://github.com/openssl/openssl/blob/master/README-PROVIDERS.md).
+
+* DASHBOARD: Removed the older landing page which was deprecated in Quincy.
+  Admins can no longer enable the older, deprecated landing page layout by
+  adjusting FEATURE_TOGGLE_DASHBOARD.
+* CephFS: The `peer_add` command is deprecated in favor of the `peer_bootstrap` command.
+
 >=20.0.0
 
 * RADOS: leader monitor and stretch mode status are now included in the `ceph status` output.
