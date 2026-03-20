@@ -121,6 +121,7 @@ class PosixConnectedSocketImpl final : public ConnectedSocketImpl {
     while (left_pbrs) {
       struct msghdr msg;
       struct iovec msgvec[IOV_MAX];
+      memset(msgvec, 0, sizeof(msgvec));
       uint64_t size = std::min<uint64_t>(left_pbrs, IOV_MAX);
       left_pbrs -= size;
       // FIPS zeroization audit 20191115: this memset is not security related.
