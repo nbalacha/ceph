@@ -30,6 +30,7 @@ struct DBOpUserInfo {
   RGWUserInfo uinfo = {};
   obj_version user_version;
   rgw::sal::Attrs user_attrs;
+  std::list<RGWUserInfo> list_entries;
 };
 
 struct DBOpBucketInfo {
@@ -345,6 +346,7 @@ struct DBOps {
   std::shared_ptr<class InsertUserOp> InsertUser;
   std::shared_ptr<class RemoveUserOp> RemoveUser;
   std::shared_ptr<class GetUserOp> GetUser;
+  std::shared_ptr<class ListUsersOp> ListUsers;
   std::shared_ptr<class InsertBucketOp> InsertBucket;
   std::shared_ptr<class UpdateBucketOp> UpdateBucket;
   std::shared_ptr<class RemoveBucketOp> RemoveBucket;
@@ -820,6 +822,28 @@ class GetUserOp: virtual public DBOp {
         return fmt::format(Query, params.user_table,
             params.op.user.user_id);
       }
+    }
+};
+
+
+class ListUsersOp: virtual public DBOp {
+    static constexpr std::string_view Query = "SELECT \
+                          UserID, Tenant, NS, DisplayName, UserEmail, \
+                          AccessKeysID, AccessKeysSecret, AccessKeys, SwiftKeys,\
+                          SubUsers, Suspended, MaxBuckets, OpMask, UserCaps, Admin, \
+                          System, PlacementName, PlacementStorageClass, PlacementTags, \
+                          BucketQuota, TempURLKeys, UserQuota, Type, MfaIDs, AssumedRoleARN, \
+                          UserAttrs, UserVersion, UserVersionTag from '{}' where \
+                          UserID >= {} ORDER BY UserID ASC LIMIT {} ";
+
+  public:
+    virtual ~ListUsersOp() {}
+
+    static std::string Schema(DBOpPrepareParams &params) {
+      return fmt::format(Query,
+        params.user_table,
+        params.op.user.user_id,
+        params.op.list_max_count);
     }
 };
 
@@ -1589,6 +1613,11 @@ class DB {
         RGWObjVersionTracker *pobjv_tracker, RGWUserInfo* pold_info);
     int remove_user(const DoutPrefixProvider *dpp,
         RGWUserInfo& uinfo, RGWObjVersionTracker *pobjv_tracker);
+    int list_users(const DoutPrefixProvider *dpp,
+        const std::string& marker,
+        uint64_t max,
+        std::list<std::string>& keys,
+        bool *is_truncated);
     int get_bucket_info(const DoutPrefixProvider *dpp, const std::string& query_str,
         const std::string& query_str_val,
         RGWBucketInfo& info, rgw::sal::Attrs* pattrs, ceph::real_time* pmtime,
