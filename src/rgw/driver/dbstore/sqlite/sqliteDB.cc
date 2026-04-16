@@ -721,6 +721,7 @@ int SQLiteDB::createTables(const DoutPrefixProvider *dpp)
 
   params.user_table = getUserTable();
   params.bucket_table = getBucketTable();
+  params.quota_table = getQuotaTable();
 
   if ((cu = createUserTable(dpp, &params)))
     goto out;
@@ -738,6 +739,8 @@ out:
       DeleteUserTable(dpp, &params);
     if (cb)
       DeleteBucketTable(dpp, &params);
+    if (cq)
+      DeleteQuotaTable(dpp, &params);
     ldpp_dout(dpp, 0)<<"Creation of tables failed" << dendl;
   }
 
